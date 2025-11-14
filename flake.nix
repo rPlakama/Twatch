@@ -11,14 +11,16 @@
   in {
     devShells.${system}.default = pkgs.mkShell {
       buildInputs = with pkgs; [
-      stress-ng
+      rustfmt
       rust-analyzer
-      gnuplot
       cargo
       ];
 
       shellHook = ''
-      Ola.
+      echo "Tbench project Devshell."
+      rust-analyzer --version \
+      rustfmt --version \
+      cargo --version \
       '';
     };
   };
