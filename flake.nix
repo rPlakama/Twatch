@@ -19,7 +19,7 @@
       shellHook = ''
       echo "Tbench project Devshell."
       rust-analyzer --version \
-      rustfmt --version \
+      rustfmt -V \
       cargo --version \
       '';
     };
