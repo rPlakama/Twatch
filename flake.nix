@@ -12,7 +12,9 @@
     devShells.${system}.default = pkgs.mkShell {
       buildInputs = with pkgs; [
       stress-ng
+      rust-analyzer
       gnuplot
+      cargo
       ];
 
       shellHook = ''
