@@ -1,5 +1,5 @@
 use std::io;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 fn main() {
     println!("Enter Duration(S):  ");
 
@@ -10,8 +10,9 @@ fn main() {
     );
 
     let duration = Duration::from_secs(seconds);
-    while duration > Duration::from_secs(0) {
-        // Agora fazer a estrutura do loop 
+    let start = Instant::now();
 
+    while Instant::now() - start < duration {
+        print!("ola");
     }
 }
