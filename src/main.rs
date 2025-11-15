@@ -1,6 +1,5 @@
 use std::io::{self, Write};
 use std::time::{Duration, Instant};
-use tbench::pow;
 fn main() {
     println!("Enter Duration(S):  ");
     let mut _i = 0u64;
@@ -21,8 +20,6 @@ fn main() {
             .unwrap_or_else(|| Duration::from_secs(0));
         print!("\rTime to end: {}s ", remaining.as_secs());
         std::io::stdout().flush().unwrap();
-        while Instant::now() - start < duration {
-            pow();
-        }
+        while Instant::now() - start < duration {}
     }
 }
