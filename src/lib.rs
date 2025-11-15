@@ -1,3 +1,3 @@
-pub fn karatsuba() {
+pub fn algorithm() {
     println!("Karatsuba");
 }
