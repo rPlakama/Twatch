@@ -14,6 +14,7 @@
       rustfmt
       rust-analyzer
       cargo
+      gh
       ];
 
       shellHook = ''
