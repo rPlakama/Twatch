@@ -1,5 +1,6 @@
 use std::io::{self, Write};
 use std::time::{Duration, Instant};
+
 fn main() {
     println!("Enter Duration(S):  ");
     let mut _i = 0u64;
