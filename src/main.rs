@@ -2,6 +2,7 @@ use std::io::{self, Write};
 use std::time::{Duration, Instant};
 fn main() {
     println!("Enter Duration(S):  ");
+    let mut _i = 0u64;
 
     let mut input_duration = String::new();
     io::stdin().read_line(&mut input_duration).expect("Failed");
@@ -19,5 +20,6 @@ fn main() {
             .unwrap_or_else(|| Duration::from_secs(0));
         print!("\rTime to end: {}s ", remaining.as_secs());
         std::io::stdout().flush().unwrap();
+        while Instant::now() - start < duration {}
     }
 }
