@@ -1,4 +1,4 @@
-use std::io;
+use std::io::{self, Write};
 use std::time::{Duration, Instant};
 fn main() {
     println!("Enter Duration(S):  ");
@@ -12,7 +12,12 @@ fn main() {
     let duration = Duration::from_secs(seconds);
     let start = Instant::now();
 
-    while Instant::now() - start < duration {
-        print!("ola");
+    while Instant::now() - start <= duration {
+        let elapse = Instant::now() - start;
+        let remaining = duration
+            .checked_sub(elapse)
+            .unwrap_or_else(|| Duration::from_secs(0));
+        print!("\rTime to end: {}s ", remaining.as_secs());
+        std::io::stdout().flush().unwrap();
     }
 }
