@@ -1,5 +1,6 @@
 use std::fs;
 use std::io::{self, Write};
+use std::thread;
 use std::time::{Duration, Instant};
 
 fn countdown() {
@@ -20,12 +21,29 @@ fn countdown() {
             .unwrap_or_else(|| Duration::from_secs(0));
         print!("\rTime to end: {}s ", remaining.as_secs());
         std::io::stdout().flush().unwrap();
+        thread::sleep(Duration::from_millis(100));
+        println!("\nCountdown finished!");
+    }
+}
+fn search_loop(duration: Duration) {
+    let start = Instant::now();
+
+    search();
+
+    while Instant::now() - start <= duration {
+        thread::sleep(Duration::from_secs(2));
+        if Instant::now() - start > duration {
+            break;
+        }
+
+        search();
     }
 }
 fn search() {
     struct Labels {
         label: String,
         is_cpu: bool,
+        is_nvme: bool,
         temp: u32,
     }
 
@@ -47,6 +65,8 @@ fn search() {
             .unwrap_or_default()
             .trim()
             .to_string();
+        let is_nvme = device_name.contains("nvme");
+        println!("Device {}, Is NVME {}", device_name, is_nvme);
         let is_cpu = device_name.contains("coretemp") || device_name.contains("k10temp");
         println!("Device {}, is CPU {}", device_name, is_cpu);
 
@@ -67,6 +87,7 @@ fn search() {
                     search_labels.push(Labels {
                         label: label_string,
                         is_cpu: is_cpu,
+                        is_nvme: is_nvme,
                         temp: temp_value,
                     });
                 }
@@ -76,22 +97,65 @@ fn search() {
 
     println!("\n");
     for label_data in &search_labels {
+        let device_type = if label_data.is_cpu {
+            "CPU"
+        } else if label_data.is_nvme {
+            "NVME"
+        } else {
+            "DEVICE"
+        };
         println!(
-            "[{}] {} - {}°C",
-            if label_data.is_cpu { "CPU" } else { "Device" },
-            label_data.label,
-            label_data.temp
+            "[{}] {}: {}°C",
+            device_type, label_data.label, label_data.temp
         );
     }
 }
+fn countdown_task(duration: Duration) {
+    let start = Instant::now();
+
+    while Instant::now() - start <= duration {
+        let elapse = Instant::now() - start;
+        let remaining = duration
+            .checked_sub(elapse)
+            .unwrap_or_else(|| Duration::from_secs(0));
+
+        println!(
+            "\x1B[H\rWatching... Time remaining: {}s ",
+            remaining.as_secs()
+        );
+        std::io::stdout().flush().unwrap();
+
+        thread::sleep(Duration::from_millis(100)); // Sleep to not hog CPU
+    }
+    println!("\nWatcher finished!");
+}
 fn watcher() {
-    println!("Watching devices temperatures, input timeout: ");
-    countdown();
+    println!("Watching devices temperatures, input timeout: \n");
+    let mut input_duration = String::new();
+    io::stdin().read_line(&mut input_duration).expect("Failed!");
+    let seconds: u64 = input_duration
+        .trim()
+        .parse()
+        .expect("Could not reach seconds");
+    let duration = Duration::from_secs(seconds);
+
+    let search_handle = thread::spawn(move || {
+        search_loop(duration);
+    });
+
+    let countdown_handle = thread::spawn(move || {
+        countdown_task(duration);
+    });
+
+    search_handle
+        .join()
+        .expect("Search: Sensors. Thread panicked.");
+    countdown_handle.join().expect("Countdown thread panicked.");
 }
 
 fn main() {
     loop {
-        println!("Select funtion: \n 1 ― Sensors. \n 2 ― Countdown");
+        println!("Select funtion: \n 1 ― Sensors. \n 2 ― Countdown \n 3 - Watcher");
         let mut input = String::new();
         io::stdin().read_line(&mut input).expect("Failed");
 
@@ -99,11 +163,18 @@ fn main() {
 
         match choice {
             "1" => {
+                println!("\x1B[2J");
                 search();
                 break;
             }
             "2" => {
+                println!("\x1B[2J");
                 countdown();
+                break;
+            }
+            "3" => {
+                println!("\x1B[2J");
+                watcher();
                 break;
             }
             _ => {

@@ -1,6 +1,5 @@
 vim/
-
-
-
 target/
+.obsidian/
+.obsidian*
 
