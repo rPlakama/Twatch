@@ -20,7 +20,6 @@ fn countdown() {
             .unwrap_or_else(|| Duration::from_secs(0));
         print!("\rTime to end: {}s ", remaining.as_secs());
         std::io::stdout().flush().unwrap();
-        //while Instant::now() - start < duration { printl}
     }
 }
 fn search() {
