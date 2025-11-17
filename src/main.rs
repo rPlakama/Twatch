@@ -66,9 +66,7 @@ fn search() {
             .trim()
             .to_string();
         let is_nvme = device_name.contains("nvme");
-        println!("Device {}, Is NVME {}", device_name, is_nvme);
         let is_cpu = device_name.contains("coretemp") || device_name.contains("k10temp");
-        println!("Device {}, is CPU {}", device_name, is_cpu);
 
         if let Ok(entries) = fs::read_dir(&path) {
             for entry in entries.filter_map(Result::ok) {
@@ -83,7 +81,6 @@ fn search() {
                         .unwrap_or("Unknown".to_string())
                         .trim()
                         .to_string();
-                    println!("Found Temp: {}, Label {}", temp_value, label_string);
                     search_labels.push(Labels {
                         label: label_string,
                         is_cpu: is_cpu,
@@ -102,12 +99,14 @@ fn search() {
         } else if label_data.is_nvme {
             "NVME"
         } else {
-            "DEVICE"
+            "Unknown"
         };
-        println!(
-            "[{}] {}: {}°C",
-            device_type, label_data.label, label_data.temp
-        );
+        if device_type != "Unknown" {
+            println!(
+                "[{}] {}: {}°C",
+                device_type, label_data.label, label_data.temp
+            );
+        }
     }
 }
 fn countdown_task(duration: Duration) {
@@ -125,7 +124,7 @@ fn countdown_task(duration: Duration) {
         );
         std::io::stdout().flush().unwrap();
 
-        thread::sleep(Duration::from_millis(100)); // Sleep to not hog CPU
+        thread::sleep(Duration::from_millis(100)); // pra n abusar da cpu
     }
     println!("\nWatcher finished!");
 }
