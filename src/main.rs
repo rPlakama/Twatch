@@ -85,16 +85,31 @@ fn search() {
         );
     }
 }
+fn watcher() {
+    println!("Watching devices temperatures, input timeout: ");
+    countdown();
+}
 
 fn main() {
-    println!("Select funtion: \n 1 ― Sensors. \n 2 ― Countdown");
+    loop {
+        println!("Select funtion: \n 1 ― Sensors. \n 2 ― Countdown");
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).expect("Failed");
 
-    let mut choice = String::new();
-    io::stdin().read_line(&mut choice).expect("Failed");
+        let choice = input.trim();
 
-    if choice.trim() == "1" {
-        search();
-    } else if choice.trim() == "2" {
-        countdown();
-    };
+        match choice {
+            "1" => {
+                search();
+                break;
+            }
+            "2" => {
+                countdown();
+                break;
+            }
+            _ => {
+                println!("\nThat is not a valid option. Please try again.\n");
+            }
+        }
+    }
 }
