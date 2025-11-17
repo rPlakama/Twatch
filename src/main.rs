@@ -1,26 +1,47 @@
+use std::fs;
 use std::io::{self, Write};
 use std::time::{Duration, Instant};
 
+fn search() {
+    let content = fs::read_to_string("/sys/class/hwmon/hwmon1/temp1_input")
+        .expect("Should have been able to read the file.");
+
+    let temp: i32 = content
+        .trim()
+        .parse()
+        .expect("Could not parse temperature.");
+
+    println!("Current temperature: {}C", temp / 1000);
+}
+
 fn main() {
-    println!("Enter Duration(S):  ");
-    let mut _i = 0u64;
+    println!("Select funtion: \n 1 ― Sensors. \n 2 ― Countdown");
 
-    let mut input_duration = String::new();
-    io::stdin().read_line(&mut input_duration).expect("Failed");
-    let seconds: u64 = input_duration.trim().parse().expect(
-        "Enter a valid input, if it was a number, please use ( 0 to 18,446,744,073,709,551,615 )",
-    );
+    let mut choice = String::new();
+    io::stdin().read_line(&mut choice).expect("Failed");
+    println!("{choice}");
 
-    let duration = Duration::from_secs(seconds);
-    let start = Instant::now();
+    if choice.trim() == "1" {
+        search();
+    } else if choice.trim() == "2" {
+        println!("Enter Duration(S):  ");
+        let mut _i = 0u64;
 
-    while Instant::now() - start <= duration {
-        let elapse = Instant::now() - start;
-        let remaining = duration
-            .checked_sub(elapse)
-            .unwrap_or_else(|| Duration::from_secs(0));
-        print!("\rTime to end: {}s ", remaining.as_secs());
-        std::io::stdout().flush().unwrap();
-        while Instant::now() - start < duration {}
+        let mut input_duration = String::new();
+        io::stdin().read_line(&mut input_duration).expect("Failed");
+        let seconds: u64 = input_duration.trim().parse().expect(".");
+
+        let duration = Duration::from_secs(seconds);
+        let start = Instant::now();
+
+        while Instant::now() - start <= duration {
+            let elapse = Instant::now() - start;
+            let remaining = duration
+                .checked_sub(elapse)
+                .unwrap_or_else(|| Duration::from_secs(0));
+            print!("\rTime to end: {}s ", remaining.as_secs());
+            std::io::stdout().flush().unwrap();
+            while Instant::now() - start < duration {}
+        }
     }
 }
