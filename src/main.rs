@@ -20,12 +20,35 @@ fn countdown() {
             .unwrap_or_else(|| Duration::from_secs(0));
         print!("\rTime to end: {}s ", remaining.as_secs());
         std::io::stdout().flush().unwrap();
-        while Instant::now() - start < duration {}
+        //while Instant::now() - start < duration { printl}
     }
 }
+
 fn search() {
-    let hmowns = fs::read_dir("/sys/class/hwmon/").unwrap();
-    println!("{:?}", hmowns);
+    struct Labels {
+        label: String,
+        is_cpu: bool,
+        temp: u32,
+    }
+    let mut search_labels: Vec<Labels> = Vec::new();
+    let hwmon_paths = fs::read_dir("/sys/class/hwmon/")
+        .expect("Could not read the sys/class/hwmon directory")
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.is_dir()
+                && path
+                    .file_name()
+                    .map_or(false, |name| name.to_string_lossy().starts_with("hwmon"))
+        });
+    for path in hwmon_paths {
+        let device_name = fs::read_to_string(path.join("name"))
+            .unwrap_or_default()
+            .trim()
+            .to_string();
+        let is_cpu = device_name.contains("coretemp") || device_name.contains("k10temp");
+        println!("Device {}, is CPU {}", device_name, is_cpu);
+    }
 }
 
 fn main() {
