@@ -23,14 +23,15 @@ fn countdown() {
         //while Instant::now() - start < duration { printl}
     }
 }
-
 fn search() {
     struct Labels {
         label: String,
         is_cpu: bool,
         temp: u32,
     }
+
     let mut search_labels: Vec<Labels> = Vec::new();
+
     let hwmon_paths = fs::read_dir("/sys/class/hwmon/")
         .expect("Could not read the sys/class/hwmon directory")
         .filter_map(Result::ok)
@@ -41,6 +42,7 @@ fn search() {
                     .file_name()
                     .map_or(false, |name| name.to_string_lossy().starts_with("hwmon"))
         });
+
     for path in hwmon_paths {
         let device_name = fs::read_to_string(path.join("name"))
             .unwrap_or_default()
@@ -48,6 +50,39 @@ fn search() {
             .to_string();
         let is_cpu = device_name.contains("coretemp") || device_name.contains("k10temp");
         println!("Device {}, is CPU {}", device_name, is_cpu);
+
+        if let Ok(entries) = fs::read_dir(&path) {
+            for entry in entries.filter_map(Result::ok) {
+                let file_name = entry.file_name().to_string_lossy().to_string();
+                if file_name.starts_with("temp") && file_name.ends_with("_input") {
+                    let temp_string = fs::read_to_string(entry.path()).unwrap_or_default();
+                    let temp_value: u32 = temp_string.trim().parse().unwrap_or(0) / 1000;
+                    let label_path = entry
+                        .path()
+                        .with_file_name(file_name.replace("_input", "_label"));
+                    let label_string = fs::read_to_string(label_path)
+                        .unwrap_or("Unknown".to_string())
+                        .trim()
+                        .to_string();
+                    println!("Found Temp: {}, Label {}", temp_value, label_string);
+                    search_labels.push(Labels {
+                        label: label_string,
+                        is_cpu: is_cpu,
+                        temp: temp_value,
+                    });
+                }
+            }
+        }
+    }
+
+    println!("Sensors");
+    for label_data in &search_labels {
+        println!(
+            "[{}] {} - {}°C",
+            if label_data.is_cpu { "CPU" } else { "Device" },
+            label_data.label,
+            label_data.temp
+        );
     }
 }
 
