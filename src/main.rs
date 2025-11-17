@@ -24,15 +24,10 @@ fn countdown() {
     }
 }
 fn search() {
-    let content = fs::read_to_string("/sys/class/hwmon/hwmon1/temp1_input")
+    let sensor = fs::read_to_string("/sys/class/hwmon/hwmon1/temp1_label")
         .expect("Should have been able to read the file.");
 
-    let temp: i32 = content
-        .trim()
-        .parse()
-        .expect("Could not parse temperature.");
-
-    println!("Current temperature: {}C", temp / 1000);
+    println!("Sensor name \n{}", sensor)
 }
 
 fn main() {
@@ -40,7 +35,6 @@ fn main() {
 
     let mut choice = String::new();
     io::stdin().read_line(&mut choice).expect("Failed");
-    println!("{choice}");
 
     if choice.trim() == "1" {
         search();
