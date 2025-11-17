@@ -1,6 +1,6 @@
 TODO:
 
-- A way to indentify if the hwmon in a CPU temperature (so it auto adjust per system.)
-- How to do it?
+- A way to indentify if the hwmon in a CPU temperature (so it auto adjust per system.) (FINISHED)
+- Update per second, then a option to choice the update rate of the things, and selective updates.
 
-Fazer uma variavel do tipo array com todos os hwmon, e procurar qual delas contem as informações que batem de CPU, e dar aquela váriavel como de CPU.
+

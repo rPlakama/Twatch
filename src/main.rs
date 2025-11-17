@@ -75,7 +75,7 @@ fn search() {
         }
     }
 
-    println!("Sensors");
+    println!("\n");
     for label_data in &search_labels {
         println!(
             "[{}] {} - {}°C",
