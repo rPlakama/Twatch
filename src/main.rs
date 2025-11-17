@@ -24,10 +24,8 @@ fn countdown() {
     }
 }
 fn search() {
-    let sensor = fs::read_to_string("/sys/class/hwmon/hwmon1/temp1_label")
-        .expect("Should have been able to read the file.");
-
-    println!("Sensor name \n{}", sensor)
+    let hmowns = fs::read_dir("/sys/class/hwmon/").unwrap();
+    println!("{:?}", hmowns);
 }
 
 fn main() {
