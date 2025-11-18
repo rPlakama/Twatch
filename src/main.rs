@@ -90,7 +90,7 @@ fn sensor_loop() -> std::io::Result<()> {
     let mut _output_name = String::new();
 
     loop {
-        let candidate = format!("sessio_{}.csv", session_id);
+        let candidate = format!("session_{}.csv", session_id);
         if !Path::new(&candidate).exists() {
             _output_name = candidate;
             break;
