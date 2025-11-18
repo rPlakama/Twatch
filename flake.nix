@@ -19,6 +19,7 @@
         gh
         # Datahandling
         python313
+	ruff
         python313Packages.pandas
         python313Packages.matplotlib
       ];
@@ -28,6 +29,8 @@
         rustfmt -V; \
         rust-analyzer --version; \
         cargo --version; \
+	python --version; \
+	ruff --version; \
       '';
     };
   };
