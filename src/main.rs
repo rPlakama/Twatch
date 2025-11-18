@@ -120,7 +120,7 @@ fn sensor_loop() -> std::io::Result<()> {
 
             writeln!(output, "{},{},{}", device_type, sensor.label, sensor.temp)?;
             output.flush()?;
-            thread::sleep(time::Duration::from_secs(1));
+            thread::sleep(time::Duration::from_millis(250));
         }
     }
 }

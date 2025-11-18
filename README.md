@@ -2,9 +2,10 @@ TODO:
 
 - TIMEOUT SYSTEMS FOR SESSIONS
 - TRIGGER START FOR SESSIONS (as temperature) 
-- EXCLUDE OR ADD DEVICES (for sessions)
+- EXCLUDE OR ADD DEVICES (for session)
+- RUST TO PYTHON INTEGRATION(to create an graph after trigger is finished)
+- MAKING RUST CREATE (IF NOT EXISTS) A PATH TO SAVE SESSIONS, FALLOWING COMMON LINUX (per example, LOCAL)
 
-INCREMENTAL TODO, GRAPHS:
-
-- Python for handling data? Maybe.
+Optional: 
+- MAKING A TUI? 
 
