@@ -1,5 +1,6 @@
 use std::fs::{self, File};
 use std::io::{self, Write};
+use std::path::Path;
 use std::thread;
 use std::time::{self};
 
@@ -25,10 +26,10 @@ fn main() {
 
         match choice {
             "1" => {
-                sensor_loop();
+                let _ = sensor_loop();
             }
             "2" => {
-                sensor_loop();
+                let _ = sensor_loop();
             }
             _ => {
                 println!("Invalid Selection.");
@@ -85,11 +86,21 @@ fn search_sensors() -> std::io::Result<Vec<SensorLabel>> {
     Ok(collected_data)
 }
 fn sensor_loop() -> std::io::Result<()> {
+    let mut session_id = 0;
+    let mut _output_name = String::new();
+
+    loop {
+        let candidate = format!("sessio_{}.csv", session_id);
+        if !Path::new(&candidate).exists() {
+            _output_name = candidate;
+            break;
+        }
+        session_id += 1;
+    }
+    let mut output = File::create(&_output_name)?;
+    writeln!(output, "Type,Label,Temp")?;
     loop {
         let sensors = search_sensors()?;
-        let mut file = File::create("output.csv")?;
-
-        writeln!(file, "Type,Label,Temp")?;
 
         for sensor in &sensors {
             let device_type = if sensor.is_cpu {
@@ -105,9 +116,9 @@ fn sensor_loop() -> std::io::Result<()> {
                 device_type, sensor.label, sensor.temp
             );
 
-            writeln!(file, "{},{},{}", device_type, sensor.label, sensor.temp)?;
-            file.flush()?;
-            thread::sleep(time::Duration::from_secs(0));
+            writeln!(output, "{},{},{}", device_type, sensor.label, sensor.temp)?;
+            output.flush()?;
+            thread::sleep(time::Duration::from_secs(1));
         }
     }
 }
