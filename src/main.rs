@@ -1,43 +1,43 @@
-use std::fs;
+use std::fs::{self, File};
 use std::io::{self, Write};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::{self};
+
+pub struct SensorLabel {
+    pub label: String,
+    pub is_cpu: bool,
+    pub is_nvme: bool,
+    pub temp: u32,
+}
 
 fn main() {
     loop {
-        println!("Select function: \n 1 ― Sensors. \n 2 ― Sensors(With Unknown).");
+        println!(
+            " -- Twach -- \n 1 ― With Unknown-label sensors \n 2 ― Without Unknown-label sensors"
+        );
         let mut input = String::new();
         io::stdin().read_line(&mut input).expect("Failed");
 
         let choice = input.trim();
 
+        print!("\x1B[2J\x1B[1;1H");
+        println!("--- Sensor Monitor ---");
+
         match choice {
             "1" => {
-                println!("\x1B[2J");
-                watcher(false);
-                break;
+                sensor_loop();
             }
             "2" => {
-                println!("\x1B[2J");
-                watcher(true);
-                break;
+                sensor_loop();
             }
             _ => {
-                println!("\nThat is not a valid option. Please try again.\n");
+                println!("Invalid Selection.");
             }
         }
     }
 }
-
-fn search(show_unknown: bool) {
-    struct Labels {
-        label: String,
-        is_cpu: bool,
-        is_nvme: bool,
-        temp: u32,
-    }
-
-    let mut search_labels: Vec<Labels> = Vec::new();
+fn search_sensors() -> std::io::Result<Vec<SensorLabel>> {
+    let mut collected_data: Vec<SensorLabel> = Vec::new();
 
     let hwmon_paths = fs::read_dir("/sys/class/hwmon/")
         .expect("Could not read the sys/class/hwmon directory")
@@ -71,7 +71,7 @@ fn search(show_unknown: bool) {
                         .unwrap_or("Unknown".to_string())
                         .trim()
                         .to_string();
-                    search_labels.push(Labels {
+                    collected_data.push(SensorLabel {
                         label: label_string,
                         is_cpu: is_cpu,
                         is_nvme: is_nvme,
@@ -82,103 +82,32 @@ fn search(show_unknown: bool) {
         }
     }
 
-    println!("\n");
-    for label_data in &search_labels {
-        let device_type = if label_data.is_cpu {
-            "CPU"
-        } else if label_data.is_nvme {
-            "NVME"
-        } else {
-            "Unknown"
-        };
+    Ok(collected_data)
+}
+fn sensor_loop() -> std::io::Result<()> {
+    loop {
+        let sensors = search_sensors()?;
+        let mut file = File::create("output.csv")?;
 
-        if device_type != "Unknown" || show_unknown {
+        writeln!(file, "Type,Label,Temp")?;
+
+        for sensor in &sensors {
+            let device_type = if sensor.is_cpu {
+                "CPU"
+            } else if sensor.is_nvme {
+                "NVME"
+            } else {
+                "Unknown"
+            };
+
             println!(
-                "[{}] {}: {}°C",
-                device_type, label_data.label, label_data.temp
+                "\x1B[1m[{}] {}: {}°C\x1B[0m",
+                device_type, sensor.label, sensor.temp
             );
+
+            writeln!(file, "{},{},{}", device_type, sensor.label, sensor.temp)?;
+            file.flush()?;
+            thread::sleep(time::Duration::from_secs(0));
         }
     }
-}
-
-fn countdown() {
-    println!("Enter Duration(S):  ");
-    let mut _i = 0u64;
-
-    let mut input_duration = String::new();
-    io::stdin().read_line(&mut input_duration).expect("Failed");
-    let seconds: u64 = input_duration.trim().parse().expect(".");
-
-    let duration = Duration::from_secs(seconds);
-    let start = Instant::now();
-
-    while Instant::now() - start <= duration {
-        let elapse = Instant::now() - start;
-        let remaining = duration
-            .checked_sub(elapse)
-            .unwrap_or_else(|| Duration::from_secs(0));
-        print!("\rTime to end: {}s ", remaining.as_secs());
-        std::io::stdout().flush().unwrap();
-        thread::sleep(Duration::from_millis(100));
-        println!("\nCountdown finished!");
-    }
-}
-
-fn search_loop(duration: Duration, show_unknown: bool) {
-    let start = Instant::now();
-
-    search(show_unknown);
-
-    while Instant::now() - start <= duration {
-        thread::sleep(Duration::from_secs(2));
-        if Instant::now() - start > duration {
-            break;
-        }
-
-        search(show_unknown);
-    }
-}
-
-fn countdown_task(duration: Duration) {
-    let start = Instant::now();
-
-    while Instant::now() - start <= duration {
-        let elapse = Instant::now() - start;
-        let remaining = duration
-            .checked_sub(elapse)
-            .unwrap_or_else(|| Duration::from_secs(0));
-
-        println!(
-            "\x1B[H\rWatching... Time remaining: {}s ",
-            remaining.as_secs()
-        );
-        std::io::stdout().flush().unwrap();
-
-        thread::sleep(Duration::from_millis(100)); // pra n abusar da cpu
-    }
-    println!("\nWatcher finished!");
-}
-
-fn watcher(show_unknown: bool) {
-    println!("Watching devices temperatures, input timeout: \n");
-    let mut input_duration = String::new();
-    io::stdin().read_line(&mut input_duration).expect("Failed!");
-    let seconds: u64 = input_duration
-        .trim()
-        .parse()
-        .expect("Could not reach seconds");
-    let duration = Duration::from_secs(seconds);
-
-    let search_handle = thread::spawn(move || {
-        search_loop(duration, show_unknown);
-    });
-
-    let countdown_handle = thread::spawn(move || {
-        countdown_task(duration);
-    });
-
-    search_handle
-        .join()
-        .expect("Search: Sensors. Thread panicked.");
-    countdown_handle.join().expect("Countdown thread panicked.");
 }
