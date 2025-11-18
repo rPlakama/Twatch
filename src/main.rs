@@ -87,6 +87,7 @@ fn search_sensors() -> std::io::Result<Vec<SensorLabel>> {
 }
 fn sensor_loop() -> std::io::Result<()> {
     let mut session_id = 0;
+    let mut countdown = 0;
     let mut _output_name = String::new();
 
     loop {
@@ -97,6 +98,7 @@ fn sensor_loop() -> std::io::Result<()> {
         }
         session_id += 1;
     }
+    countdown += 1;
     let mut output = File::create(&_output_name)?;
     writeln!(output, "Type,Label,Temp")?;
     loop {
@@ -112,8 +114,8 @@ fn sensor_loop() -> std::io::Result<()> {
             };
 
             println!(
-                "\x1B[1m[{}] {}: {}°C\x1B[0m",
-                device_type, sensor.label, sensor.temp
+                "\x1B[1m S{}[{}] {}: {}°C\x1B[0m",
+                countdown, device_type, sensor.label, sensor.temp
             );
 
             writeln!(output, "{},{},{}", device_type, sensor.label, sensor.temp)?;
