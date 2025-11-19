@@ -12,7 +12,7 @@ plt.figure(figsize=(12, 6))
 for (t, label), group in df.groupby(["Type", "Label"]):
     plt.plot(group.index, group["Temp"], label=f"{t}-{label}")
 
-plt.xlabel("Duration")
+plt.xlabel("Captures")
 plt.ylabel("Temperature (°C)")
 plt.title("HWMON Devices Temperature")
 plt.legend(loc="upper left", fontsize="small")
