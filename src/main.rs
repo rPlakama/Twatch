@@ -7,28 +7,21 @@ use std::time::{self};
 pub struct SensorLabel {
     pub label: String,
     pub is_cpu: bool,
+    pub is_amd_gpu: bool,
     pub is_nvme: bool,
     pub temp: u32,
 }
 
 fn main() {
     loop {
-        println!(
-            " -- Twach -- \n 1 ― With Unknown-label sensors \n 2 ― Without Unknown-label sensors"
-        );
+        println!("Press 1 to start.");
         let mut input = String::new();
         io::stdin().read_line(&mut input).expect("Failed");
 
         let choice = input.trim();
 
-        print!("\x1B[2J\x1B[1;1H");
-        println!("--- Sensor Monitor ---");
-
         match choice {
             "1" => {
-                let _ = sensor_loop();
-            }
-            "2" => {
                 let _ = sensor_loop();
             }
             _ => {
@@ -58,6 +51,7 @@ fn search_sensors() -> std::io::Result<Vec<SensorLabel>> {
             .to_string();
         let is_nvme = device_name.contains("nvme");
         let is_cpu = device_name.contains("coretemp") || device_name.contains("k10temp");
+        let is_amd_gpu = device_name.contains("amdgpu");
 
         if let Ok(entries) = fs::read_dir(&path) {
             for entry in entries.filter_map(Result::ok) {
@@ -76,6 +70,7 @@ fn search_sensors() -> std::io::Result<Vec<SensorLabel>> {
                         label: label_string,
                         is_cpu: is_cpu,
                         is_nvme: is_nvme,
+                        is_amd_gpu: is_amd_gpu,
                         temp: temp_value,
                     });
                 }
@@ -91,36 +86,47 @@ fn sensor_loop() -> std::io::Result<()> {
     let mut _output_name = String::new();
 
     loop {
-        let candidate = format!("session_{}.csv", session_id);
+        let candidate = format!("sessions/session_{}.csv", session_id);
         if !Path::new(&candidate).exists() {
             _output_name = candidate;
             break;
         }
         session_id += 1;
     }
-    countdown += 1;
+    if let Some(parent) = Path::new(&_output_name).parent() {
+        std::fs::create_dir_all(parent)?;
+    }
     let mut output = File::create(&_output_name)?;
     writeln!(output, "Type,Label,Temp")?;
     loop {
+        countdown += 1;
         let sensors = search_sensors()?;
+        let mut display_tui = String::new();
+
+        print!("\x1B[2J\x1B[1;1H");
+        println!("--- Sensor Monitor ---");
+        println!("  Current Capture: {}", countdown);
 
         for sensor in &sensors {
             let device_type = if sensor.is_cpu {
                 "CPU"
             } else if sensor.is_nvme {
                 "NVME"
+            } else if sensor.is_amd_gpu {
+                "GPU"
             } else {
                 "Unknown"
             };
-
-            println!(
-                "\x1B[1m S{}[{}] {}: {}°C\x1B[0m",
-                countdown, device_type, sensor.label, sensor.temp
-            );
+            display_tui.push_str(&format!(
+                " \x1B[1m [{}] {}: {}°C\x1B[0m \n",
+                device_type, sensor.label, sensor.temp
+            ));
 
             writeln!(output, "{},{},{}", device_type, sensor.label, sensor.temp)?;
             output.flush()?;
-            thread::sleep(time::Duration::from_millis(250));
         }
+        print!("{}", display_tui);
+        io::stdout().flush()?;
+        thread::sleep(time::Duration::from_millis(250));
     }
 }

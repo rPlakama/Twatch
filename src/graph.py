@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
-sessions = glob.glob("../session_*")
+sessions = glob.glob("../sessions/session_*")
 last_session = sessions[-1]
 df = pd.read_csv(f"{last_session}")
 
