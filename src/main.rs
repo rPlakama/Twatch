@@ -15,9 +15,9 @@ pub struct SensorLabel {
 
 fn main() {
     loop {
-        println!("1. -- Start Monitoring");
-        println!("2. -- Plot Latest Session");
-        println!("3. -- By Trigger");
+        println!("1. -- Raw Session");
+        println!("2. -- Plot Latest");
+        println!("3. -- Trigger pipeline");
         println!("4  -- Quit");
 
         let mut input = String::new();
@@ -163,5 +163,7 @@ fn trigger() {
     io::stdin().read_line(&mut end).expect("Failed");
     let end_int: u32 = start.trim().parse().unwrap_or(0);
 
-    while start > end {}
+    while start_int > end_int {
+        sensor_loop();
+    }
 }
