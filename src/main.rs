@@ -1,6 +1,7 @@
 use std::fs::{self, File};
 use std::io::{self, Write};
 use std::path::Path;
+use std::process::Command;
 use std::thread;
 use std::time::{self};
 
@@ -14,7 +15,11 @@ pub struct SensorLabel {
 
 fn main() {
     loop {
-        println!("Press 1 to start.");
+        println!("1. -- Start Monitoring");
+        println!("2. -- Plot Latest Session");
+        println!("3. -- By Trigger");
+        println!("4  -- Quit");
+
         let mut input = String::new();
         io::stdin().read_line(&mut input).expect("Failed");
 
@@ -22,8 +27,22 @@ fn main() {
 
         match choice {
             "1" => {
-                let _ = sensor_loop();
+                if let Err(e) = sensor_loop() {
+                    eprintln!("Error in sensor loop: {}", e);
+                }
             }
+            "2" => {
+                println!("Launching python plotter...");
+                let child = Command::new("python").arg("graph.py").spawn();
+                match child {
+                    Ok(_) => println!("Plotter started sucesfully"),
+                    Err(e) => eprintln!("Failed to start plotter: {}", e),
+                }
+            }
+            "3" => {
+                trigger();
+            }
+            "4" => break,
             _ => {
                 println!("Invalid Selection.");
             }
@@ -129,4 +148,20 @@ fn sensor_loop() -> std::io::Result<()> {
         io::stdout().flush()?;
         thread::sleep(time::Duration::from_millis(250));
     }
+}
+fn trigger() {
+    print!("\x1B[2J\x1B[1;1H");
+    println!("Input the start temperature value");
+
+    let mut start = String::new();
+    io::stdin().read_line(&mut start).expect("Failed");
+    let start_int: u32 = start.trim().parse().unwrap_or(0);
+
+    println!("Input end temperature value");
+
+    let mut end = String::new();
+    io::stdin().read_line(&mut end).expect("Failed");
+    let end_int: u32 = start.trim().parse().unwrap_or(0);
+
+    while start > end {}
 }
