@@ -4,7 +4,7 @@ import pandas as pd
 import sys
 
 
-sessions = glob.glob("sessions/session_*.csv")
+sessions = glob.glob("session/session_*.csv")
 count = len(sessions)
 
 if count < 1:
