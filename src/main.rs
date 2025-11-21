@@ -168,10 +168,30 @@ fn trigger() {
     io::stdin().read_line(&mut couldown).expect("Failed");
     let int_couldown: u64 = couldown.trim().parse().unwrap_or(0);
 
-    let cpu_temp = search_sensors()
-        .unwrap_or_default()
-        .into_iter()
-        .find(|s| s.is_cpu)
-        .map(|s| s.temp)
-        .unwrap_or(0);
+    loop {
+        let cpu_temp = search_sensors()
+            .unwrap_or_default()
+            .into_iter()
+            .find(|s| s.is_cpu)
+            .map(|s| s.temp)
+            .unwrap_or(0);
+        println!("Current CPU temp: {}°C", cpu_temp);
+
+        if cpu_temp >= temp_int && cpu_temp <= end_temp_int {
+            println!(
+                "✓ Trigger activated: {}°C is within range [{}, {}]",
+                cpu_temp, temp_int, end_temp_int
+            );
+        } else if cpu_temp < temp_int {
+            println!("Waiting... {}°C < {}°C", cpu_temp, temp_int);
+        } else if cpu_temp > end_temp_int {
+            println!(
+                "CRITICAL: {}°C exceeds limit {}°C - Stopping!",
+                cpu_temp, end_temp_int
+            );
+            break;
+        }
+
+        std::thread::sleep(std::time::Duration::from_millis(int_couldown));
+    }
 }
