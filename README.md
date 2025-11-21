@@ -1,11 +1,5 @@
 TODO:
 
-- TIMEOUT SYSTEMS FOR SESSIONS
-- TRIGGER START FOR SESSIONS (as temperature) 
-- EXCLUDE OR ADD DEVICES (for session)
-- RUST TO PYTHON INTEGRATION(to create an graph after trigger is finished)
-- MAKING RUST CREATE (IF NOT EXISTS) A PATH TO SAVE SESSIONS, FALLOWING COMMON LINUX (per example, LOCAL)
-
-Optional: 
-- MAKING A TUI? 
-
+- Trigger system 'start temperature' & 'end temperature' 
+- By 'ticks' system, aka 'duration' 
+- configuration of 'ticks' per 'second' 'current 1tick/250ms'
