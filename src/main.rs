@@ -170,7 +170,7 @@ fn sensor_loop() -> std::io::Result<()> {
         thread::sleep(time::Duration::from_millis(250));
     }
 }
-fn trigger() {
+fn trigger() -> std::io::Result<()> {
     print!("\x1B[2J\x1B[1;1H");
     println!("Input start trigger temperature");
 
@@ -189,27 +189,35 @@ fn trigger() {
     io::stdin().read_line(&mut couldown).expect("Failed");
     let int_couldown: u64 = couldown.trim().parse().unwrap_or(0);
 
+    let sensors = search_sensors()?;
+    let mut session = session_writter()?;
+    let mut countdown = 0;
+
     loop {
-        let cpu_temp = search_sensors()
-            .unwrap_or_default()
+        countdown += 1;
+
+        let cpu_temp = search_sensors()?
             .into_iter()
             .find(|s| s.is_cpu)
             .map(|s| s.temp)
             .unwrap_or(0);
-        println!("Current CPU temp: {}°C", cpu_temp);
+        print!("\x1B[2J\x1B[1;1H");
+        println!("--- Trigger Monitor ---");
+        println!("  Capture: {}", countdown);
+        println!("  CPU Temp: {}°C", cpu_temp);
+        println!("  Range: [{}, {}]", temp_int, end_temp_int);
 
-        if cpu_temp >= temp_int && cpu_temp <= end_temp_int {
-            println!(
-                "{}°C is within range [{}, {}]",
-                cpu_temp, temp_int, end_temp_int
-            );
-        } else if cpu_temp < temp_int {
-            println!("Waiting... {}°C < {}°C", cpu_temp, temp_int);
-        } else if cpu_temp > end_temp_int {
-            println!("{}°C exceeds limit {}°C", cpu_temp, end_temp_int);
+        writeln!(session.file, "CPU,Current,{}", cpu_temp)?;
+        session.file.flush()?;
+
+        if cpu_temp >= temp_int {
+            println!("Trigger activated: {}°C >= {}°C", cpu_temp, temp_int);
+        }
+        if end_temp_int < cpu_temp {
+            writeln!(session.file, "CPU,Exit, {}", cpu_temp)?;
             break;
         }
-
         std::thread::sleep(std::time::Duration::from_millis(int_couldown));
     }
+    Ok(())
 }
