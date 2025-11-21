@@ -1,3 +1,6 @@
 TODO:
 
-- Making session write into trigger thingy.
+- Function by timeout
+- Implement other devices in the trigger 
+
+
