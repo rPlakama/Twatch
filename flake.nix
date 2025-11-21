@@ -1,5 +1,5 @@
 {
-  description = "Tbench";
+  description = "Twatch development shell";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -25,7 +25,6 @@
       ];
 
       shellHook = ''
-        echo "Tbench project Devshell."
         rustfmt -V; \
         rust-analyzer --version; \
         cargo --version; \
