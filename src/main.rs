@@ -194,7 +194,7 @@ fn trigger() -> std::io::Result<()> {
 
     let mut session = session_writter()?;
     let mut countdown = 0;
-    let mut plot_flag = false;
+    let mut _plot_flag = false;
 
     loop {
         countdown += 1;
@@ -218,12 +218,12 @@ fn trigger() -> std::io::Result<()> {
         }
         if end_temp_int < cpu_temp {
             writeln!(session.file, "CPU,Exit, {}", cpu_temp)?;
-            plot_flag = true;
+            _plot_flag = true;
             break;
         }
         std::thread::sleep(std::time::Duration::from_millis(int_couldown));
     }
-    if plot_flag {
+    if _plot_flag {
         plot_maker();
     }
 
