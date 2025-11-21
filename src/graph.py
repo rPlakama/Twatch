@@ -8,7 +8,7 @@ sessions = glob.glob("sessions/session_*.csv")
 count = len(sessions)
 
 if count < 1:
-    print("N of Sessions: {count}")
+    print(f"N of Sessions: {count}")
     print("Sessions not detected, quitting.")
     sys.exit(0)
 else:
