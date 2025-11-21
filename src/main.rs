@@ -17,7 +17,7 @@ fn main() {
     loop {
         println!("1. -- Raw Session");
         println!("2. -- Plot Latest");
-        println!("3. -- Trigger pipeline");
+        println!("3. -- Trigger (By CPU TEMP)");
         println!("4  -- Quit");
 
         let mut input = String::new();
@@ -179,16 +179,13 @@ fn trigger() {
 
         if cpu_temp >= temp_int && cpu_temp <= end_temp_int {
             println!(
-                "✓ Trigger activated: {}°C is within range [{}, {}]",
+                "{}°C is within range [{}, {}]",
                 cpu_temp, temp_int, end_temp_int
             );
         } else if cpu_temp < temp_int {
             println!("Waiting... {}°C < {}°C", cpu_temp, temp_int);
         } else if cpu_temp > end_temp_int {
-            println!(
-                "CRITICAL: {}°C exceeds limit {}°C - Stopping!",
-                cpu_temp, end_temp_int
-            );
+            println!("{}°C exceeds limit {}°C", cpu_temp, end_temp_int);
             break;
         }
 
