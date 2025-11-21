@@ -115,7 +115,7 @@ fn search_sensors() -> std::io::Result<Vec<SensorLabel>> {
 
     Ok(collected_data)
 }
-fn session_writter() -> std::io::Result<(SessionFile)> {
+fn session_writter() -> std::io::Result<SessionFile> {
     let mut session_id = 0;
 
     loop {
