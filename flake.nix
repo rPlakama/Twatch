@@ -30,6 +30,7 @@
         cargo --version; \
 	python --version; \
 	ruff --version; \
+	fish \
       '';
     };
   };
