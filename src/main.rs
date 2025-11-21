@@ -41,7 +41,7 @@ fn main() {
     loop {
         println!("1. -- Raw Session");
         println!("2. -- Plot Latest");
-        println!("3. -- Trigger (By CPU TEMP)");
+        println!("3. -- Trigger");
         println!("4  -- Quit");
 
         let mut input = String::new();
@@ -175,6 +175,7 @@ fn sensor_loop() -> std::io::Result<()> {
 }
 fn trigger() -> std::io::Result<()> {
     print!("\x1B[2J\x1B[1;1H");
+
     println!("Input start trigger temperature");
 
     let mut temp = String::new();
@@ -226,6 +227,5 @@ fn trigger() -> std::io::Result<()> {
     if _plot_flag {
         plot_maker();
     }
-
     Ok(())
 }
