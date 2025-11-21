@@ -151,19 +151,27 @@ fn sensor_loop() -> std::io::Result<()> {
 }
 fn trigger() {
     print!("\x1B[2J\x1B[1;1H");
-    println!("Input the start temperature value");
+    println!("Input start trigger temperature");
 
-    let mut start = String::new();
-    io::stdin().read_line(&mut start).expect("Failed");
-    let start_int: u32 = start.trim().parse().unwrap_or(0);
+    let mut temp = String::new();
+    io::stdin().read_line(&mut temp).expect("Failed");
+    let temp_int: u32 = temp.trim().parse().unwrap_or(0);
 
-    println!("Input end temperature value");
+    println!("Input end trigger temperature");
 
-    let mut end = String::new();
-    io::stdin().read_line(&mut end).expect("Failed");
-    let end_int: u32 = start.trim().parse().unwrap_or(0);
+    let mut end_temp = String::new();
+    io::stdin().read_line(&mut end_temp).expect("Failed");
+    let end_temp_int: u32 = end_temp.trim().parse().unwrap_or(0);
 
-    while start_int > end_int {
-        sensor_loop();
-    }
+    println!("Digit the scan couldown(ms)");
+    let mut couldown = String::new();
+    io::stdin().read_line(&mut couldown).expect("Failed");
+    let int_couldown: u64 = couldown.trim().parse().unwrap_or(0);
+
+    let cpu_temp = search_sensors()
+        .unwrap_or_default()
+        .into_iter()
+        .find(|s| s.is_cpu)
+        .map(|s| s.temp)
+        .unwrap_or(0);
 }
