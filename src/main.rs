@@ -17,6 +17,14 @@ pub struct SensorLabel {
     pub temp: u32,
 }
 
+fn plot_maker() {
+    println!("Launching python plotter...");
+    let child = Command::new("python").arg("graph.py").spawn();
+    match child {
+        Ok(_) => println!("Plotter started sucesfully"),
+        Err(e) => eprintln!("Failed to start plotter: {}", e),
+    }
+}
 fn device_type(sensor: &SensorLabel) -> &'static str {
     if sensor.is_cpu {
         "CPU"
@@ -48,12 +56,7 @@ fn main() {
                 }
             }
             "2" => {
-                println!("Launching python plotter...");
-                let child = Command::new("python").arg("graph.py").spawn();
-                match child {
-                    Ok(_) => println!("Plotter started sucesfully"),
-                    Err(e) => eprintln!("Failed to start plotter: {}", e),
-                }
+                plot_maker();
             }
             "3" => {
                 trigger();
@@ -189,9 +192,9 @@ fn trigger() -> std::io::Result<()> {
     io::stdin().read_line(&mut couldown).expect("Failed");
     let int_couldown: u64 = couldown.trim().parse().unwrap_or(0);
 
-    let sensors = search_sensors()?;
     let mut session = session_writter()?;
     let mut countdown = 0;
+    let mut plot_flag = false;
 
     loop {
         countdown += 1;
@@ -215,9 +218,14 @@ fn trigger() -> std::io::Result<()> {
         }
         if end_temp_int < cpu_temp {
             writeln!(session.file, "CPU,Exit, {}", cpu_temp)?;
+            plot_flag = true;
             break;
         }
         std::thread::sleep(std::time::Duration::from_millis(int_couldown));
     }
+    if plot_flag {
+        plot_maker();
+    }
+
     Ok(())
 }
