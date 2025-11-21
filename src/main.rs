@@ -5,12 +5,28 @@ use std::process::Command;
 use std::thread;
 use std::time::{self};
 
+pub struct SessionFile {
+    pub id: u32,
+    pub file: File,
+}
 pub struct SensorLabel {
     pub label: String,
     pub is_cpu: bool,
     pub is_amd_gpu: bool,
     pub is_nvme: bool,
     pub temp: u32,
+}
+
+fn device_type(sensor: &SensorLabel) -> &'static str {
+    if sensor.is_cpu {
+        "CPU"
+    } else if sensor.is_nvme {
+        "NVME"
+    } else if sensor.is_amd_gpu {
+        "GPU"
+    } else {
+        "Unknown"
+    }
 }
 
 fn main() {
@@ -99,24 +115,32 @@ fn search_sensors() -> std::io::Result<Vec<SensorLabel>> {
 
     Ok(collected_data)
 }
-fn sensor_loop() -> std::io::Result<()> {
+fn session_writter() -> std::io::Result<(SessionFile)> {
     let mut session_id = 0;
-    let mut countdown = 0;
-    let mut _output_name = String::new();
 
     loop {
-        let candidate = format!("sessions/session_{}.csv", session_id);
-        if !Path::new(&candidate).exists() {
-            _output_name = candidate;
-            break;
+        let condidate = format!("session/session_{}.csv", session_id);
+        if !Path::new(&condidate).exists() {
+            if let Some(parent) = Path::new(&condidate).parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+
+            let mut file = File::create(&condidate)?;
+            writeln!(file, "Type,Label,Temp")?;
+
+            return Ok(SessionFile {
+                id: session_id,
+                file: file,
+            });
         }
         session_id += 1;
     }
-    if let Some(parent) = Path::new(&_output_name).parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    let mut output = File::create(&_output_name)?;
-    writeln!(output, "Type,Label,Temp")?;
+}
+
+fn sensor_loop() -> std::io::Result<()> {
+    let mut session = session_writter()?;
+    let mut countdown = 0;
+
     loop {
         countdown += 1;
         let sensors = search_sensors()?;
@@ -127,22 +151,19 @@ fn sensor_loop() -> std::io::Result<()> {
         println!("  Current Capture: {}", countdown);
 
         for sensor in &sensors {
-            let device_type = if sensor.is_cpu {
-                "CPU"
-            } else if sensor.is_nvme {
-                "NVME"
-            } else if sensor.is_amd_gpu {
-                "GPU"
-            } else {
-                "Unknown"
-            };
+            let device_type = device_type(sensor);
+
             display_tui.push_str(&format!(
                 " \x1B[1m [{}] {}: {}°C\x1B[0m \n",
                 device_type, sensor.label, sensor.temp
             ));
 
-            writeln!(output, "{},{},{}", device_type, sensor.label, sensor.temp)?;
-            output.flush()?;
+            writeln!(
+                session.file,
+                "{},{},{}",
+                device_type, sensor.label, sensor.temp
+            )?;
+            session.file.flush()?;
         }
         print!("{}", display_tui);
         io::stdout().flush()?;
