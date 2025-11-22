@@ -58,9 +58,7 @@ fn main() {
             "2" => {
                 plot_maker();
             }
-            "3" => {
-                trigger();
-            }
+            "3" => trigger().expect("Trigger Failed"),
             "4" => break,
             _ => {
                 println!("Invalid Selection.");
