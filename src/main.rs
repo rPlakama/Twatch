@@ -37,15 +37,22 @@ fn device_type(sensor: &SensorLabel) -> &'static str {
     }
 }
 
-fn main() {
+fn main() -> std::io::Result<()> {
     loop {
+        let cpu_temp = search_sensors()?
+            .into_iter()
+            .find(|s| s.is_cpu)
+            .map(|s| s.temp)
+            .unwrap_or(0);
+
+        println!("Current (CPU) TEMP: {}", cpu_temp);
         println!("1. -- Raw Session");
         println!("2. -- Plot Latest");
         println!("3. -- Trigger");
         println!("4  -- Quit");
 
         let mut input = String::new();
-        io::stdin().read_line(&mut input).expect("Failed");
+        io::stdin().read_line(&mut input)?;
 
         let choice = input.trim();
 
@@ -58,8 +65,8 @@ fn main() {
             "2" => {
                 plot_maker();
             }
-            "3" => trigger().expect("Trigger Failed"),
-            "4" => break,
+            "3" => trigger()?,
+            "4" => break Ok(()),
             _ => {
                 println!("Invalid Selection.");
             }
