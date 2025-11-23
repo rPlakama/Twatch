@@ -26,8 +26,7 @@ fn record_frame(
     let mut display_tui = String::from("\x1B[1;1H\x1B[?25l");
 
     display_tui.push_str(&format!("{}\n", header_msg));
-    display_tui.push_str(&format!(" Current Capture: {}", countdown));
-    //Gotta fix the break line
+    display_tui.push_str(&format!("Current Capture: {}", countdown));
 
     for sensor in &sensors {
         let d_type = device_type(sensor);
