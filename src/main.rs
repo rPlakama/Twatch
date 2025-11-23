@@ -32,7 +32,6 @@ fn record_frame(
     for sensor in &sensors {
         let d_type = device_type(sensor);
 
-
         println!("");
         display_tui.push_str(&format!(
             "\n [{}] {}: {}°C",
@@ -190,67 +189,111 @@ fn sensor_loop() -> std::io::Result<()> {
 }
 
 fn trigger() -> std::io::Result<()> {
-    print!("\x1B[2J\x1B[1;1H");
+    println!(" -- 1 By temperature \n -- 2 By captures");
 
-    println!("Input start trigger temperature:");
-    let mut temp = String::new();
-    io::stdin().read_line(&mut temp).expect("Failed");
-    let start_limit: u32 = temp.trim().parse().unwrap_or(0);
+    let mut input = String::new();
+    std::io::stdin().read_line(&mut input)?;
+    let input_trim = input.trim();
+    if input_trim == "1" {
+        print!("\x1B[2J\x1B[1;1H");
 
-    println!("Input end trigger temperature (Stop if > this):");
-    let mut end_temp = String::new();
-    io::stdin().read_line(&mut end_temp).expect("Failed");
-    let end_limit: u32 = end_temp.trim().parse().unwrap_or(0);
+        println!("Input start trigger temperature:");
+        let mut temp = String::new();
+        io::stdin().read_line(&mut temp).expect("Failed");
+        let start_limit: u32 = temp.trim().parse().unwrap_or(0);
 
-    println!("Digit the scan cooldown(ms):");
-    let mut cooldown_str = String::new();
-    io::stdin().read_line(&mut cooldown_str).expect("Failed");
-    let cooldown_ms: u64 = cooldown_str.trim().parse().unwrap_or(250);
+        println!("Input end trigger temperature (Stop if > this):");
+        let mut end_temp = String::new();
+        io::stdin().read_line(&mut end_temp).expect("Failed");
+        let end_limit: u32 = end_temp.trim().parse().unwrap_or(0);
+
+        println!("Digit the scan cooldown(ms):");
+        let mut cooldown_str = String::new();
+        io::stdin().read_line(&mut cooldown_str).expect("Failed");
+        let cooldown_ms: u64 = cooldown_str.trim().parse().unwrap_or(250);
+
+        let mut session = session_writter()?;
+        let mut countdown = 0;
+        let mut _plot_flag = false;
+        print!("\x1B[2J");
+
+        loop {
+            countdown += 1;
+
+            let status_header = format!(
+                "--- Trigger Monitor ---\nRange: [Start: {}°C, End: {}°C] \n",
+                start_limit, end_limit
+            );
+
+            let sensors = record_frame(&mut session, countdown, &status_header)?;
+
+            let cpu_temp = sensors
+                .iter()
+                .find(|s| s.is_cpu)
+                .map(|s| s.temp)
+                .unwrap_or(0);
+
+            println!("\nStatus:");
+
+            if cpu_temp >= start_limit {
+                println!(
+                    "\x1B[33m Trigger Active: {}°C >= {}°C\x1B[0m",
+                    cpu_temp, start_limit
+                );
+            } else {
+                println!("Trigger to be reached...");
+            }
+
+            if cpu_temp > end_limit {
+                println!("\x1B[31m Limit reached ({}°C).\x1B[0m", cpu_temp);
+                writeln!(session.file, "CPU,Exit,{}", cpu_temp)?;
+                _plot_flag = true;
+                break;
+            }
+
+            std::thread::sleep(std::time::Duration::from_millis(cooldown_ms));
+        }
+
+        if _plot_flag {
+            plot_maker();
+        }
+
+        Ok(())
+    } else if input_trim == "2" {
+        trigger_by_timeout()
+    } else {
+        println!("Invalid input");
+        Ok(())
+    }
+}
+
+fn trigger_by_timeout() -> std::io::Result<()> {
+    println!("Input delay between captures");
+    let mut input = String::new();
+    io::stdin().read_line(&mut input).expect("Failed");
+    let cooldown_ms: u64 = input.trim().parse().unwrap_or(250);
+
+    println!("input amount of caputures");
+    let mut input = String::new();
+    io::stdin().read_line(&mut input).expect("Failed");
+    let amount: u16 = input.trim().parse().unwrap_or(2500);
 
     let mut session = session_writter()?;
-    let mut countdown = 0;
-    let mut _plot_flag = false;
 
-    loop {
-        countdown += 1;
+    for i in 1..amount {
+        print!("\x1B[2J");
+        let header = format!("\r-- By capture limit -- \n Target: {} frames \n", amount);
 
-        let status_header = format!(
-            "--- Trigger Monitor ---\nRange: [Start: {}°C, End: {}°C] \n",
-            start_limit, end_limit
-        );
-
-        let sensors = record_frame(&mut session, countdown, &status_header)?;
-
-        let cpu_temp = sensors
-            .iter()
-            .find(|s| s.is_cpu)
-            .map(|s| s.temp)
-            .unwrap_or(0);
-
-        println!("\nStatus:");
-
-        if cpu_temp >= start_limit {
-            println!(
-                "\x1B[33m Trigger Active: {}°C >= {}°C\x1B[0m",
-                cpu_temp, start_limit
-            );
-        } else {
-            println!("Trigger to be reached...");
-        }
-
-        if cpu_temp > end_limit {
-            println!("\x1B[31m Limit reached ({}°C).\x1B[0m", cpu_temp);
-            writeln!(session.file, "CPU,Exit,{}", cpu_temp)?;
-            _plot_flag = true;
-            break;
-        }
+        record_frame(&mut session, i as usize, &header)?;
 
         std::thread::sleep(std::time::Duration::from_millis(cooldown_ms));
     }
+    println!(
+        "\rCaptures completed, total of {} frames, requesting graph.",
+        amount
+    );
 
-    if _plot_flag {
-        plot_maker();
-    }
+    plot_maker();
 
     Ok(())
 }
