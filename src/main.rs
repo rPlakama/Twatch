@@ -195,7 +195,7 @@ fn trigger() -> std::io::Result<()> {
     std::io::stdin().read_line(&mut input)?;
     let input_trim = input.trim();
     if input_trim == "1" {
-        print!("\x1B[2J\x1B[1;1H");
+        print!("\r\x1B[2J\x1B[1;1H");
 
         println!("Input start trigger temperature:");
         let mut temp = String::new();
@@ -218,6 +218,8 @@ fn trigger() -> std::io::Result<()> {
         print!("\x1B[2J");
 
         loop {
+            print!("\r\x1B[2J\x1B[1;1H");
+
             countdown += 1;
 
             let status_header = format!(
