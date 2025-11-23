@@ -23,16 +23,19 @@ fn record_frame(
     header_msg: &str,
 ) -> std::io::Result<Vec<SensorLabel>> {
     let sensors = search_sensors()?;
-    let mut display_tui = String::from("\x1B[1;1H\x1B[?25l");
 
-    display_tui.push_str(&format!("{}\n", header_msg));
+    let mut display_tui: String = Default::default();
+
+    display_tui.push_str(&format!("{}", header_msg));
     display_tui.push_str(&format!("Current Capture: {}", countdown));
 
     for sensor in &sensors {
         let d_type = device_type(sensor);
 
+
+        println!("");
         display_tui.push_str(&format!(
-            " \x1B[1m [{}] {}: {}°C\x1B[0m \n",
+            "\n [{}] {}: {}°C",
             d_type, sensor.label, sensor.temp
         ));
 
@@ -41,10 +44,9 @@ fn record_frame(
 
     display_tui.push_str("\x1B[J");
 
-    print!("{}", display_tui);
+    println!("{}", display_tui);
 
     session.file.flush()?;
-    io::stdout().flush()?;
 
     Ok(sensors)
 }
@@ -213,7 +215,7 @@ fn trigger() -> std::io::Result<()> {
         countdown += 1;
 
         let status_header = format!(
-            "--- Trigger Monitor ---\n Range: [Start: {}°C, End: {}°C]",
+            "--- Trigger Monitor ---\nRange: [Start: {}°C, End: {}°C] \n",
             start_limit, end_limit
         );
 
