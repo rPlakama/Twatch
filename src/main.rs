@@ -23,12 +23,11 @@ fn record_frame(
     header_msg: &str,
 ) -> std::io::Result<Vec<SensorLabel>> {
     let sensors = search_sensors()?;
-    let mut display_tui = String::new();
+    let mut display_tui = String::from("\x1B[1;1H\x1B[?25l");
 
-    print!("\x1B[2J\x1B[1;1H");
-
-    println!("{}", header_msg);
-    println!(" Current Capture: {}", countdown);
+    display_tui.push_str(&format!("{}\n", header_msg));
+    display_tui.push_str(&format!(" Current Capture: {}", countdown));
+    //Gotta fix the break line
 
     for sensor in &sensors {
         let d_type = device_type(sensor);
@@ -41,8 +40,11 @@ fn record_frame(
         writeln!(session.file, "{},{},{}", d_type, sensor.label, sensor.temp)?;
     }
 
-    session.file.flush()?;
+    display_tui.push_str("\x1B[J");
+
     print!("{}", display_tui);
+
+    session.file.flush()?;
     io::stdout().flush()?;
 
     Ok(sensors)
