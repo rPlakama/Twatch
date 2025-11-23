@@ -14,5 +14,5 @@ The project current works by capturing information from /sys/class/hwmon/ and cl
     _This where it sets two different ways of auto-finishing and plotting based in the number of captures and the target temperatures._
 
 - What is this project useful for?
-    _Mere having graphics for 'what took to reach x temperature' or 'how my hardware did during a defined time'
+    _Mere having graphics for 'what took to reach x temperature' or 'how my hardware did during a defined time'_
 
