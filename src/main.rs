@@ -298,6 +298,21 @@ fn trigger_by_timeout() -> std::io::Result<()> {
     Ok(())
 }
 
-fn session_selector() {
-    let current = fs::read_dir("./").expect("Could not read the current path");
+fn session_selector() -> io::Result<()> {
+    let mut entries = fs::read_dir(".")?
+        .filter_map(|res| res.ok())
+        .map(|e| e.path())
+        .collect::<Vec<_>>();
+
+    let found_session = entries
+        .iter()
+        .any(|p| p.file_name() == Some("session".as_ref()) && p.is_dir());
+
+    if found_session {
+        println!("Found session");
+    } else {
+        println!("Session not found");
+    }
+
+    Ok(())
 }
