@@ -78,11 +78,10 @@ fn main() -> std::io::Result<()> {
             .unwrap_or(0);
 
         println!("Current (CPU) TEMP: {}", cpu_temp);
-        println!("1. -- Raw Session");
-        println!("2. -- Selection Session");
-        println!("3. -- Plot Latest");
-        println!("4. -- Trigger");
-        println!("5  -- Quit");
+        println!("1. -- Selection Session");
+        println!("2. -- Plot Latest");
+        println!("3. -- Trigger");
+        println!("4  -- Quit");
 
         let mut input = String::new();
         io::stdin().read_line(&mut input)?;
@@ -91,18 +90,13 @@ fn main() -> std::io::Result<()> {
 
         match choice {
             "1" => {
-                if let Err(e) = sensor_loop() {
-                    eprintln!("Error in sensor loop: {}", e);
-                }
-            }
-            "2" => {
                 session_selector();
             }
-            "3" => {
+            "2" => {
                 plot_maker();
             }
-            "4" => trigger()?,
-            "5" => break Ok(()),
+            "3" => trigger()?,
+            "4" => break Ok(()),
             _ => {
                 println!("Invalid Selection.");
             }
@@ -305,7 +299,5 @@ fn trigger_by_timeout() -> std::io::Result<()> {
 }
 
 fn session_selector() {
-let current = fs::read_dir("./")
-    .expect("Could not read the current path");
-
+    let current = fs::read_dir("./").expect("Could not read the current path");
 }
