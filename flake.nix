@@ -12,12 +12,10 @@
     formatter.x86_64-linux = nixpkgs.legacyPackages.x86_64-linux.alejandra;
     devShells.${system}.default = pkgs.mkShell {
       buildInputs = with pkgs; [
-	# Wayland 
-	wayland
         # Sensors
         rustfmt
         rust-analyzer
-        cargo
+	rustc
         gh
         # Datahandling
         python313
