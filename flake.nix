@@ -12,25 +12,24 @@
     formatter.x86_64-linux = nixpkgs.legacyPackages.x86_64-linux.alejandra;
     devShells.${system}.default = pkgs.mkShell {
       buildInputs = with pkgs; [
-        # Sensors
+        cargo-tauri
         rustfmt
         rust-analyzer
-	rustc
+        cargo
         gh
-        # Datahandling
         python313
-	ruff
+        ruff
         python313Packages.pandas
         python313Packages.matplotlib
       ];
 
       shellHook = ''
-        rustfmt -V; \
-        rust-analyzer --version; \
-        cargo --version; \
-	python --version; \
-	ruff --version; \
-	fish \
+               rustfmt -V; \
+               rust-analyzer --version; \
+               cargo --version; \
+        python --version; \
+        ruff --version; \
+        fish \
       '';
     };
   };

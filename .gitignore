@@ -4,3 +4,8 @@ target/
 .obsidian*
 session_*
 
+
+
+# Added by cargo
+
+/target
