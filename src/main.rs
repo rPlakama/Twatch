@@ -1,4 +1,4 @@
-use pyo3::{prelude::*, types::PyModule};
+use pyo3::prelude::*;
 use std::{
     fs::{self, File},
     io::{self, Write},
@@ -25,6 +25,7 @@ pub struct ArgumentPassers {
     pub amount_captures: i16,
     pub initial_temperature: u32,
     pub end_temperature: u32,
+    pub session_exists: bool,
 }
 
 fn record_frame(
@@ -83,17 +84,15 @@ fn main() {
     let mut args = std::env::args().skip(1);
 
     let mut arg_passers = ArgumentPassers {
-        // They can act as defaults, if some evil shit happens
         is_by_temperature: false,
         ms_delay: 250,
         amount_captures: 250,
         plot_latest: false,
         end_temperature: 90,
         initial_temperature: 40,
+        session_exists: false,
     };
 
-    let mut start_temp: u32 = 0;
-    let mut end_temp: u32 = 0;
     let sensors = search_sensors().unwrap_or_default();
 
     let cpu_temp = sensors
@@ -291,7 +290,7 @@ fn trigger_by_timeout(amount: i16, delay: u64) -> std::io::Result<()> {
     Ok(())
 }
 
-fn session_selector() -> io::Result<()> {
+fn session_selector(arg_passers: &mut ArgumentPassers) -> io::Result<()> {
     let entries = fs::read_dir(".")?
         .filter_map(|res| res.ok())
         .map(|e| e.path())
@@ -302,6 +301,7 @@ fn session_selector() -> io::Result<()> {
         .any(|p| p.file_name() == Some("session".as_ref()) && p.is_dir());
 
     if found_session {
+        arg_passers.session_exists = found_session;
         println!("Found session");
     } else {
         println!("Session not found");
@@ -317,11 +317,11 @@ fn plot_maker() -> PyResult<()> {
     println!("Launching Python plotter...");
 
     Python::attach(|py| {
-        let code = std::fs::read_to_string("graph.py").expect("Failed to read graph.py");
+        let code = include_str!("graph.py");
 
-        let code_sctr = std::ffi::CString::new(code).expect("Failed to Converto to CString");
-
-        PyModule::from_code(py, code_sctr.as_c_str(), c"graph.py", c"graph")?;
+        let builtins = py.import("builtins")?;
+        let exec = builtins.getattr("exec")?;
+        exec.call1((code,))?;
 
         println!("Plotter completed successfully");
         Ok(())
