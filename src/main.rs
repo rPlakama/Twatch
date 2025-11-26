@@ -1,8 +1,8 @@
-use pyo3::prelude::*;
 use std::{
     fs::{self, File},
     io::{self, Write},
     path::Path,
+    process::Command,
     thread, time,
 };
 
@@ -74,9 +74,15 @@ fn device_type(sensor: &SensorLabel) -> &'static str {
 
 fn args_processor(passers: &ArgumentPassers) {
     if passers.is_by_temperature {
-        trigger_by_temperature(passers);
+        if let Err(e) = trigger_by_temperature(passers) {
+            eprintln!("Error during temperature monitoring: {}", e);
+        }
     } else if passers.plot_latest {
-        plot_maker();
+        if passers.session_exists {
+            plot_maker();
+        } else {
+            println!("Unable to find session file, do a capture first.");
+        }
     }
 }
 
@@ -134,6 +140,7 @@ fn main() {
             }
         }
     }
+    let _ = session_selector(&mut arg_passers);
     args_processor(&arg_passers);
 }
 
@@ -309,21 +316,11 @@ fn session_selector(arg_passers: &mut ArgumentPassers) -> io::Result<()> {
 
     Ok(())
 }
-fn help() {
-    println!("...");
+
+fn plot_maker() {
+    Command::new("python").arg("graph.py");
 }
 
-fn plot_maker() -> PyResult<()> {
-    println!("Launching Python plotter...");
-
-    Python::attach(|py| {
-        let code = include_str!("graph.py");
-
-        let builtins = py.import("builtins")?;
-        let exec = builtins.getattr("exec")?;
-        exec.call1((code,))?;
-
-        println!("Plotter completed successfully");
-        Ok(())
-    })
+fn help() {
+    println!("...");
 }
