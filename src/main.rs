@@ -95,7 +95,7 @@ fn main() {
         ms_delay: 250,
         amount_captures: 250,
         plot_latest: false,
-        end_temperature: 90,
+        end_temperature: 0,
         initial_temperature: 40,
         session_exists: false,
     };
@@ -110,6 +110,8 @@ fn main() {
     while let Some(arg) = args.next() {
         match &arg[..] {
             // Note to myself, Hi twin: Work up in ts later, gl vro.
+            // We have -pl working, and we also have -h working
+            // Just lacking somethings...
             "-bt" | "--by-temperature" => {
                 arg_passers.is_by_temperature = true;
             }
@@ -133,6 +135,17 @@ fn main() {
                     arg_passers.amount_captures = val_str.parse().unwrap_or(500);
                 }
             }
+            "-it" | "--initial-temperature" => {
+                if let Some(val_str) = args.next() {
+                    arg_passers.initial_temperature = val_str.parse().unwrap_or(45)
+                }
+            }
+            "-et" | "--end-temperature" => {
+                if let Some(val_str) = args.next() {
+                    arg_passers.end_temperature = val_str.parse().unwrap_or(70)
+                }
+            }
+
             _ => {
                 print!(
                     "Argument invalid or not found {} \nCurrent Temperature: {}",
