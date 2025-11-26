@@ -1,8 +1,8 @@
+use pyo3::{prelude::*, types::PyModule};
 use std::{
     fs::{self, File},
     io::{self, Write},
     path::Path,
-    process::Command,
     thread, time,
 };
 
@@ -59,14 +59,6 @@ fn record_frame(
 
     Ok(sensors)
 }
-fn plot_maker() {
-    println!("Launching python plotter...");
-    let child = Command::new("python").arg("graph.py").spawn();
-    match child {
-        Ok(_) => println!("Plotter started sucesfully"),
-        Err(e) => eprintln!("Failed to start plotter: {}", e),
-    }
-}
 fn device_type(sensor: &SensorLabel) -> &'static str {
     if sensor.is_cpu {
         "CPU"
@@ -82,12 +74,12 @@ fn device_type(sensor: &SensorLabel) -> &'static str {
 fn args_processor(passers: &ArgumentPassers) {
     if passers.is_by_temperature {
         trigger_by_temperature(passers);
+    } else if passers.plot_latest {
+        plot_maker();
     }
 }
 
 fn main() {
-    let args: Vec<String> = std::env::args().collect();
-
     let mut args = std::env::args().skip(1);
 
     let mut arg_passers = ArgumentPassers {
@@ -111,17 +103,16 @@ fn main() {
         .unwrap_or(0);
     while let Some(arg) = args.next() {
         match &arg[..] {
+            // Note to myself, Hi twin: Work up in ts later, gl vro.
             "-bt" | "--by-temperature" => {
-                println!("Works");
                 arg_passers.is_by_temperature = true;
             }
             "-h" | "--help" => {
-                println!("Also works");
+                help();
             }
             "-pl" | "--plot-latest" => {
                 arg_passers.plot_latest = true;
             }
-            "-test" => {}
             "-d" | "--delay" => {
                 if let Some(val_str) = args.next() {
                     arg_passers.ms_delay = val_str.parse().unwrap_or(250);
@@ -133,11 +124,14 @@ fn main() {
             }
             "-c" | "--captures" => {
                 if let Some(val_str) = args.next() {
-                    arg_passers.amount_captures = val_str.parse().unwrap_or(10);
+                    arg_passers.amount_captures = val_str.parse().unwrap_or(500);
                 }
             }
             _ => {
-                print!("Argument invalid or not found {}", arg)
+                print!(
+                    "Argument invalid or not found {} \nCurrent Temperature: {}",
+                    arg, cpu_temp
+                )
             }
         }
     }
@@ -241,7 +235,7 @@ fn trigger_by_temperature(passers: &ArgumentPassers) -> std::io::Result<()> {
 
         let status_header = format!(
             "--- Trigger Monitor ---\nRange: [Start: {}°C, End: {}°C] \n",
-            start_limit, end_limit
+            passers.initial_temperature, passers.end_temperature
         );
 
         let sensors = record_frame(&mut session, countdown, &status_header)?;
@@ -257,7 +251,7 @@ fn trigger_by_temperature(passers: &ArgumentPassers) -> std::io::Result<()> {
         if cpu_temp >= passers.initial_temperature {
             println!(
                 "\x1B[33m Trigger Active: {}°C >= {}°C\x1B[0m",
-                cpu_temp, passers.initial_temperature 
+                cpu_temp, passers.initial_temperature
             );
         } else {
             println!("Trigger to be reached...");
@@ -267,17 +261,15 @@ fn trigger_by_temperature(passers: &ArgumentPassers) -> std::io::Result<()> {
             println!("\x1B[31m Limit reached ({}°C).\x1B[0m", cpu_temp);
             writeln!(session.file, "CPU,Exit,{}", cpu_temp)?;
             _plot_flag = true;
-
-            std::thread::sleep(std::time::Duration::from_millis(passers.ms_delay));
-            break Ok(());
+            break;
         }
-
-        if _plot_flag {
-            plot_maker();
-        }
+        std::thread::sleep(std::time::Duration::from_millis(passers.ms_delay));
     }
+    if _plot_flag {
+        plot_maker();
+    }
+    Ok(())
 }
-
 fn trigger_by_timeout(amount: i16, delay: u64) -> std::io::Result<()> {
     let mut session = session_writter()?;
 
@@ -316,4 +308,22 @@ fn session_selector() -> io::Result<()> {
     }
 
     Ok(())
+}
+fn help() {
+    println!("...");
+}
+
+fn plot_maker() -> PyResult<()> {
+    println!("Launching Python plotter...");
+
+    Python::attach(|py| {
+        let code = std::fs::read_to_string("graph.py").expect("Failed to read graph.py");
+
+        let code_sctr = std::ffi::CString::new(code).expect("Failed to Converto to CString");
+
+        PyModule::from_code(py, code_sctr.as_c_str(), c"graph.py", c"graph")?;
+
+        println!("Plotter completed successfully");
+        Ok(())
+    })
 }
