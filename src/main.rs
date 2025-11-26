@@ -1,9 +1,11 @@
-use std::fs::{self, File};
-use std::io::{self, Write};
-use std::path::Path;
-use std::process::Command;
-use std::thread;
-use std::time::{self};
+use std::{
+    env,
+    fs::{self, File},
+    io::{self, Write},
+    path::Path,
+    process::{self, Command},
+    thread, time,
+};
 
 pub struct SessionFile {
     pub id: u32,
@@ -69,36 +71,19 @@ fn device_type(sensor: &SensorLabel) -> &'static str {
     }
 }
 
-fn main() -> std::io::Result<()> {
-    loop {
-        let cpu_temp = search_sensors()?
-            .into_iter()
-            .find(|s| s.is_cpu)
-            .map(|s| s.temp)
-            .unwrap_or(0);
-
-        println!("Current (CPU) TEMP: {}", cpu_temp);
-        println!("1. -- Selection Session");
-        println!("2. -- Plot Latest");
-        println!("3. -- Trigger");
-        println!("4  -- Quit");
-
-        let mut input = String::new();
-        io::stdin().read_line(&mut input)?;
-
-        let choice = input.trim();
-
-        match choice {
-            "1" => {
-                session_selector();
+fn main() {
+    for argument in env::args() {
+        match argument.as_str() {
+            "-bt" | "--by-temperature" => {
+                trigger_by_temperature();
             }
-            "2" => {
-                plot_maker();
+            "-h" | "--help" => {
+                println!("-bt or --by-temperature \n Calls by-temperature function");
+                process::exit(0);
             }
-            "3" => trigger()?,
-            "4" => break Ok(()),
+
             _ => {
-                println!("Invalid Selection.");
+                println!("Argument not found: {}", argument);
             }
         }
     }
@@ -203,73 +188,71 @@ fn trigger() -> std::io::Result<()> {
 }
 
 fn trigger_by_temperature() -> std::io::Result<()> {
+    print!("\r\x1B[2J\x1B[1;1H");
+
+    println!("Input start temperature:");
+    let mut temp = String::new();
+    io::stdin().read_line(&mut temp).expect("Failed");
+    let start_limit: u32 = temp.trim().parse().unwrap_or(0);
+
+    //println!("By returning to the start temperature or by limit temperature?")
+    println!("Input end trigger temperature (Stop if > this):");
+    let mut end_temp = String::new();
+    io::stdin().read_line(&mut end_temp).expect("Failed");
+    let end_limit: u32 = end_temp.trim().parse().unwrap_or(0);
+
+    println!("Digit the scan cooldown(ms):");
+    let mut cooldown_str = String::new();
+    io::stdin().read_line(&mut cooldown_str).expect("Failed");
+    let cooldown_ms: u64 = cooldown_str.trim().parse().unwrap_or(250);
+
+    let mut session = session_writter()?;
+    let mut countdown = 0;
+    let mut _plot_flag = false;
+    print!("\x1B[2J");
+
+    loop {
         print!("\r\x1B[2J\x1B[1;1H");
 
-        println!("Input start temperature:");
-        let mut temp = String::new();
-        io::stdin().read_line(&mut temp).expect("Failed");
-        let start_limit: u32 = temp.trim().parse().unwrap_or(0);
+        countdown += 1;
 
-        //println!("By returning to the start temperature or by limit temperature?")
-        println!("Input end trigger temperature (Stop if > this):");
-        let mut end_temp = String::new();
-        io::stdin().read_line(&mut end_temp).expect("Failed");
-        let end_limit: u32 = end_temp.trim().parse().unwrap_or(0);
+        let status_header = format!(
+            "--- Trigger Monitor ---\nRange: [Start: {}°C, End: {}°C] \n",
+            start_limit, end_limit
+        );
 
-        println!("Digit the scan cooldown(ms):");
-        let mut cooldown_str = String::new();
-        io::stdin().read_line(&mut cooldown_str).expect("Failed");
-        let cooldown_ms: u64 = cooldown_str.trim().parse().unwrap_or(250);
+        let sensors = record_frame(&mut session, countdown, &status_header)?;
 
-        let mut session = session_writter()?;
-        let mut countdown = 0;
-        let mut _plot_flag = false;
-        print!("\x1B[2J");
+        let cpu_temp = sensors
+            .iter()
+            .find(|s| s.is_cpu)
+            .map(|s| s.temp)
+            .unwrap_or(0);
 
-        loop {
-            print!("\r\x1B[2J\x1B[1;1H");
+        println!("\nStatus:");
 
-            countdown += 1;
-
-            let status_header = format!(
-                "--- Trigger Monitor ---\nRange: [Start: {}°C, End: {}°C] \n",
-                start_limit, end_limit
+        if cpu_temp >= start_limit {
+            println!(
+                "\x1B[33m Trigger Active: {}°C >= {}°C\x1B[0m",
+                cpu_temp, start_limit
             );
+        } else {
+            println!("Trigger to be reached...");
+        }
 
-            let sensors = record_frame(&mut session, countdown, &status_header)?;
-
-            let cpu_temp = sensors
-                .iter()
-                .find(|s| s.is_cpu)
-                .map(|s| s.temp)
-                .unwrap_or(0);
-
-            println!("\nStatus:");
-
-            if cpu_temp >= start_limit {
-                println!(
-                    "\x1B[33m Trigger Active: {}°C >= {}°C\x1B[0m",
-                    cpu_temp, start_limit
-                );
-            } else {
-                println!("Trigger to be reached...");
-            }
-
-            if cpu_temp > end_limit {
-                println!("\x1B[31m Limit reached ({}°C).\x1B[0m", cpu_temp);
-                writeln!(session.file, "CPU,Exit,{}", cpu_temp)?;
-                _plot_flag = true;
+        if cpu_temp > end_limit {
+            println!("\x1B[31m Limit reached ({}°C).\x1B[0m", cpu_temp);
+            writeln!(session.file, "CPU,Exit,{}", cpu_temp)?;
+            _plot_flag = true;
 
             std::thread::sleep(std::time::Duration::from_millis(cooldown_ms));
             break Ok(());
-
         }
 
         if _plot_flag {
             plot_maker();
         }
-
-}
+    }
 }
 
 fn trigger_by_timeout() -> std::io::Result<()> {
