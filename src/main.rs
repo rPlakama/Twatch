@@ -20,8 +20,11 @@ pub struct SensorLabel {
 
 pub struct ArgumentPassers {
     pub is_by_temperature: bool,
+    pub plot_latest: bool,
     pub ms_delay: u64,
     pub amount_captures: i16,
+    pub initial_temperature: u32,
+    pub end_temperature: u32,
 }
 
 fn record_frame(
@@ -76,26 +79,49 @@ fn device_type(sensor: &SensorLabel) -> &'static str {
     }
 }
 
+fn args_processor(passers: &ArgumentPassers) {
+    if passers.is_by_temperature {
+        trigger_by_temperature(passers);
+    }
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
 
     let mut args = std::env::args().skip(1);
 
     let mut arg_passers = ArgumentPassers {
+        // They can act as defaults, if some evil shit happens
         is_by_temperature: false,
-        ms_delay: 0,
-        amount_captures: 0,
+        ms_delay: 250,
+        amount_captures: 250,
+        plot_latest: false,
+        end_temperature: 90,
+        initial_temperature: 40,
     };
 
     let mut start_temp: u32 = 0;
     let mut end_temp: u32 = 0;
+    let sensors = search_sensors().unwrap_or_default();
 
+    let cpu_temp = sensors
+        .iter()
+        .find(|s| s.is_cpu)
+        .map(|s| s.temp)
+        .unwrap_or(0);
     while let Some(arg) = args.next() {
         match &arg[..] {
             "-bt" | "--by-temperature" => {
                 println!("Works");
                 arg_passers.is_by_temperature = true;
             }
+            "-h" | "--help" => {
+                println!("Also works");
+            }
+            "-pl" | "--plot-latest" => {
+                arg_passers.plot_latest = true;
+            }
+            "-test" => {}
             "-d" | "--delay" => {
                 if let Some(val_str) = args.next() {
                     arg_passers.ms_delay = val_str.parse().unwrap_or(250);
@@ -111,10 +137,11 @@ fn main() {
                 }
             }
             _ => {
-                println!("Unknown argument: {}", arg);
+                print!("Argument invalid or not found {}", arg)
             }
         }
     }
+    args_processor(&arg_passers);
 }
 
 fn search_sensors() -> std::io::Result<Vec<SensorLabel>> {
@@ -200,41 +227,8 @@ fn sensor_loop() -> std::io::Result<()> {
     }
 }
 
-fn trigger() -> std::io::Result<()> {
-    println!(" -- 1 By temperature \n -- 2 By captures");
-
-    let mut input = String::new();
-    std::io::stdin().read_line(&mut input)?;
-    let input_trim = input.trim();
-    if input_trim == "1" {
-        trigger_by_temperature()
-    } else if input_trim == "2" {
-        trigger_by_timeout()
-    } else {
-        println!("Invalid input");
-        Ok(())
-    }
-}
-
-fn trigger_by_temperature() -> std::io::Result<()> {
+fn trigger_by_temperature(passers: &ArgumentPassers) -> std::io::Result<()> {
     print!("\r\x1B[2J\x1B[1;1H");
-
-    println!("Input start temperature:");
-    let mut temp = String::new();
-    io::stdin().read_line(&mut temp).expect("Failed");
-    let start_limit: u32 = temp.trim().parse().unwrap_or(0);
-
-    //println!("By returning to the start temperature or by limit temperature?")
-    println!("Input end trigger temperature (Stop if > this):");
-    let mut end_temp = String::new();
-    io::stdin().read_line(&mut end_temp).expect("Failed");
-    let end_limit: u32 = end_temp.trim().parse().unwrap_or(0);
-
-    println!("Digit the scan cooldown(ms):");
-    let mut cooldown_str = String::new();
-    io::stdin().read_line(&mut cooldown_str).expect("Failed");
-    let cooldown_ms: u64 = cooldown_str.trim().parse().unwrap_or(250);
-
     let mut session = session_writter()?;
     let mut countdown = 0;
     let mut _plot_flag = false;
@@ -260,21 +254,21 @@ fn trigger_by_temperature() -> std::io::Result<()> {
 
         println!("\nStatus:");
 
-        if cpu_temp >= start_limit {
+        if cpu_temp >= passers.initial_temperature {
             println!(
                 "\x1B[33m Trigger Active: {}°C >= {}°C\x1B[0m",
-                cpu_temp, start_limit
+                cpu_temp, passers.initial_temperature 
             );
         } else {
             println!("Trigger to be reached...");
         }
 
-        if cpu_temp > end_limit {
+        if cpu_temp > passers.end_temperature {
             println!("\x1B[31m Limit reached ({}°C).\x1B[0m", cpu_temp);
             writeln!(session.file, "CPU,Exit,{}", cpu_temp)?;
             _plot_flag = true;
 
-            std::thread::sleep(std::time::Duration::from_millis(cooldown_ms));
+            std::thread::sleep(std::time::Duration::from_millis(passers.ms_delay));
             break Ok(());
         }
 
@@ -284,26 +278,16 @@ fn trigger_by_temperature() -> std::io::Result<()> {
     }
 }
 
-fn trigger_by_timeout() -> std::io::Result<()> {
-    println!("Input delay between captures");
-    let mut input = String::new();
-    io::stdin().read_line(&mut input).expect("Failed");
-    let cooldown_ms: u64 = input.trim().parse().unwrap_or(250);
-
-    println!("input amount of caputures");
-    let mut input = String::new();
-    io::stdin().read_line(&mut input).expect("Failed");
-    let amount: u16 = input.trim().parse().unwrap_or(2500);
-
+fn trigger_by_timeout(amount: i16, delay: u64) -> std::io::Result<()> {
     let mut session = session_writter()?;
 
-    for i in 1..amount {
+    for i in 1.. {
         print!("\x1B[2J");
         let header = format!("\r-- By capture limit -- \n Target: {} frames \n", amount);
 
         record_frame(&mut session, i as usize, &header)?;
 
-        std::thread::sleep(std::time::Duration::from_millis(cooldown_ms));
+        std::thread::sleep(std::time::Duration::from_millis(delay));
     }
     println!(
         "\rCaptures completed, total of {} frames, requesting graph.",
