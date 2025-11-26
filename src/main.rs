@@ -272,6 +272,16 @@ fn trigger() -> std::io::Result<()> {
     std::io::stdin().read_line(&mut input)?;
     let input_trim = input.trim();
     if input_trim == "1" {
+        trigger_by_temperature()
+    } else if input_trim == "2" {
+        trigger_by_timeout()
+    } else {
+        println!("Invalid input");
+        Ok(())
+    }
+}
+
+fn trigger_by_temperature() -> std::io:Result<()> {
         print!("\r\x1B[2J\x1B[1;1H");
 
         println!("Input start trigger temperature:");
@@ -328,7 +338,7 @@ fn trigger() -> std::io::Result<()> {
                 writeln!(session.file, "CPU,Exit,{}", cpu_temp)?;
                 _plot_flag = true;
                 break;
-            }
+            
 
             std::thread::sleep(std::time::Duration::from_millis(cooldown_ms));
         }
@@ -338,12 +348,6 @@ fn trigger() -> std::io::Result<()> {
         }
 
         Ok(())
-    } else if input_trim == "2" {
-        trigger_by_timeout()
-    } else {
-        println!("Invalid input");
-        Ok(())
-    }
 }
 
 fn trigger_by_timeout() -> std::io::Result<()> {
