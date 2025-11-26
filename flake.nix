@@ -15,6 +15,7 @@
         rustfmt
         rust-analyzer
         cargo
+	rustc
         gh
         python313
         ruff
