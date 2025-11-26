@@ -79,6 +79,7 @@ fn args_processor(passers: &ArgumentPassers) {
         }
     } else if passers.plot_latest {
         if passers.session_exists {
+            print!("Finished the job");
             plot_maker();
         } else {
             println!("Unable to find session file, do a capture first.");
@@ -318,7 +319,14 @@ fn session_selector(arg_passers: &mut ArgumentPassers) -> io::Result<()> {
 }
 
 fn plot_maker() {
-    Command::new("python").arg("graph.py");
+    match Command::new("python").arg("graph.py").status() {
+        Ok(status) => {
+            if !status.success() {
+                eprintln!("Unable to generate graph, error {}: ", status);
+            }
+        }
+        Err(e) => eprintln!("Failed to execute python {}", e),
+    }
 }
 
 fn help() {
