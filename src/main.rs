@@ -205,11 +205,12 @@ fn trigger() -> std::io::Result<()> {
 fn trigger_by_temperature() -> std::io::Result<()> {
         print!("\r\x1B[2J\x1B[1;1H");
 
-        println!("Input start trigger temperature:");
+        println!("Input start temperature:");
         let mut temp = String::new();
         io::stdin().read_line(&mut temp).expect("Failed");
         let start_limit: u32 = temp.trim().parse().unwrap_or(0);
 
+        //println!("By returning to the start temperature or by limit temperature?")
         println!("Input end trigger temperature (Stop if > this):");
         let mut end_temp = String::new();
         io::stdin().read_line(&mut end_temp).expect("Failed");
