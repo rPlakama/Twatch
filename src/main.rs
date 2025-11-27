@@ -120,7 +120,7 @@ fn main() {
             "-d" | "--delay" => {
                 if let Some(val_str) = args.next() {
                     arg_passers.ms_delay = val_str.parse().unwrap_or(250);
-                    println!("Not only works, but here the ms: {}", arg_passers.ms_delay);
+                    println!("You are missing arguments");
                 } else {
                     eprintln!("Error: -d | --d requires (value) in (ms)");
                     return;
@@ -321,7 +321,6 @@ fn session_selector(arg_passers: &mut ArgumentPassers) -> io::Result<()> {
 
     if found_session {
         arg_passers.session_exists = found_session;
-        println!("Session folder exists in current PATH");
     } else {
         println!("Session folder not found in current PATH");
     }
