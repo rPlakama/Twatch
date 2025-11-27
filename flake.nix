@@ -6,7 +6,7 @@
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs, flake-utils, ... }:
+  outputs = { nixpkgs, flake-utils, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
@@ -28,10 +28,6 @@
           cargoLock.lockFile = ./Cargo.lock;
 
           nativeBuildInputs = [ pkgs.makeWrapper ];
-
-          # The rust program calls `python graph.py`.
-          # We need to make sure `python` is in the PATH, and `graph.py` is available.
-          # We'll install `graph.py` to the same directory as the `twatch` executable.
           postInstall = ''
             cp src/graph.py $out/bin/graph.py
             wrapProgram $out/bin/twatch --prefix PATH : ${pkgs.lib.makeBinPath [ pythonEnv ]}
@@ -49,10 +45,8 @@
           ];
 
           shellHook = ''
-                       rustfmt -V; \
-                       rust-analyzer --version; \
-                       cargo --version; \
-                python --version; \
+	  rustc --version \ 
+	  rust-analyzer --version \
           '';
         };
     });
