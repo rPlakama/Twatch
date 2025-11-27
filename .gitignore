@@ -5,7 +5,9 @@ target/
 .obsidian*
 session_*
 plans/
-result/
+result/*
+src/result
+*result
 
 
 
