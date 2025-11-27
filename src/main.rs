@@ -141,7 +141,9 @@ fn main() {
                     arg_passers.end_temperature = val_str.parse().unwrap_or(70)
                 }
             }
-
+            "-ct" | "--current-temperature" => {
+                println!("CPU TEMP: {}C", cpu_temp);
+            }
             _ => {
                 println!(
                     "Argument invalid or not found {} \nCurrent Temperature: {}",
@@ -368,6 +370,7 @@ fn help() {
     -pl | --plot-latest \n
     -d  | --delay \n
     -c  | --captures \n
+    -ct | --current-temperature \n
     -h  | --help \n 
     "
     );
