@@ -2,9 +2,8 @@ use std::{
     fs::{self, File},
     io::{self, Write},
     path::Path,
-    process::{Command, Stdio},
-    thread,
-    time,
+    process::Command,
+    thread, time,
 };
 
 pub struct SessionFile {
@@ -95,7 +94,7 @@ fn main() {
         ms_delay: 250,
         amount_captures: 250,
         plot_latest: false,
-        end_temperature: 0,
+        end_temperature: 70,
         initial_temperature: 40,
         session_exists: false,
     };
@@ -109,8 +108,6 @@ fn main() {
         .unwrap_or(0);
     while let Some(arg) = args.next() {
         match &arg[..] {
-            // Note to myself, Hi twin: Work up in ts later, gl vro.
-            // Just lacking somethings...
             "-bt" | "--by-temperature" => {
                 arg_passers.is_by_temperature = true;
             }
@@ -349,7 +346,10 @@ fn plot_maker() {
     match Command::new("python").arg(&script_path).status() {
         Ok(status) => match status.code() {
             Some(0) => println!("Success!"),
-            Some(1) => println!("Python script failed with an error. Is '{}' the correct path?", script_path.display()),
+            Some(1) => println!(
+                "Python script failed with an error. Is '{}' the correct path?",
+                script_path.display()
+            ),
             Some(code) => println!("Exited with code: {}", code),
             None => println!("Process terminated by signal"),
         },
@@ -358,5 +358,17 @@ fn plot_maker() {
 }
 
 fn help() {
-    println!("...");
+    println!(
+        "\n
+        Current options are: \n 
+    -bt | --by-temperature \n
+    -bl | --by-capture-limit \n
+    -it | --initial_temperature \n
+    -et | --end_temperature \n
+    -pl | --plot-latest \n
+    -d  | --delay \n
+    -c  | --captures \n
+    -h  | --help \n 
+    "
+    );
 }
