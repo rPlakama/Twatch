@@ -79,7 +79,6 @@ fn args_processor(passers: &ArgumentPassers) {
         }
     } else if passers.plot_latest {
         if passers.session_exists {
-            print!("Finished the job");
             plot_maker();
         } else {
             println!("Unable to find session file, do a capture first.");
@@ -110,7 +109,6 @@ fn main() {
     while let Some(arg) = args.next() {
         match &arg[..] {
             // Note to myself, Hi twin: Work up in ts later, gl vro.
-            // We have -pl working, and we also have -h working
             // Just lacking somethings...
             "-bt" | "--by-temperature" => {
                 arg_passers.is_by_temperature = true;
@@ -333,12 +331,14 @@ fn session_selector(arg_passers: &mut ArgumentPassers) -> io::Result<()> {
 
 fn plot_maker() {
     match Command::new("python").arg("graph.py").status() {
-        Ok(status) => {
-            if !status.success() {
-                eprintln!("Unable to generate graph, error {}: ", status);
-            }
-        }
-        Err(e) => eprintln!("Failed to execute python {}", e),
+        Ok(status) => match status.code() {
+            Some(0) => println!("Sucess!"),
+            Some(1) => println!("Python script failed with error"),
+            Some(2) => println!("Script not found"),
+            Some(code) => println!("Exited with code: {}", code),
+            None => println!("Process terminated by signal"),
+        },
+        Err(e) => println!("Failed to execute {}", e),
     }
 }
 
