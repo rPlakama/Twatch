@@ -89,13 +89,12 @@ fn args_processor(passers: &ArgumentPassers) {
                 eprintln!("Error during the monitoring: {}", e);
             }
         }
-        (_, true, _, _) => {
+        (_, _, true, _) => {
             plot_maker();
         }
-        (_, _, true, _) => {
+        (_, _, false, _) => {
             println!("Unable to find session file, do a capture first.");
         }
-        _ => {}
     }
 }
 fn main() {
