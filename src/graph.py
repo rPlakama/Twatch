@@ -19,8 +19,8 @@ else:
         plt.plot(group.index, group["Temp"], label=f"{t}-{label}")
 
 
-    plt.axvspan(50, 100, alpha=0.05, color='red', label='Rapid Increase')
-    plt.axhspan(70, 90, alpha=0.05, color='orange', label='Above Recommended (for most devices)')
+    plt.axhspan(70, 80, alpha=0.05, color="orange", label="Warm")
+    plt.axhspan(80, 100, alpha=0.05, color="red", label="Critical")
     plt.xlabel("Captures")
     plt.ylabel("Temperature (°C)")
     plt.title("HWMON Devices Temperature")
