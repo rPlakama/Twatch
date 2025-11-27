@@ -361,8 +361,6 @@ fn by_capture_limit(passers: &ArgumentPassers) -> std::io::Result<()> {
             .map(|s| s.temp)
             .unwrap_or(0);
 
-        println!("\nStatus:");
-
         if countdown > passers.amount_captures {
             println!(
                 "\x1B[31m Target reached ([{}]).\x1B[0m",
