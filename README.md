@@ -9,8 +9,12 @@ TODO:
     > -h [Missing Content]
     > --plot-latest [DONE]
     > --delay [DONE]
-    > --captures 
-    > Initial, end temperature
+    > --captures [DONE]
+    > Initial, end temperature [DONE]
+    > by-capture-limit 
+
+- Making session debugger only spawn in session request
+- Alr alr 
 Secondary:
 
 - Watts monitor
