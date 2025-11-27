@@ -1,8 +1,7 @@
 [package]
 name = "twatch"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
-wayland-window = "0.13.3"
 

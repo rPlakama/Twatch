@@ -331,15 +331,29 @@ fn session_selector(arg_passers: &mut ArgumentPassers) -> io::Result<()> {
 }
 
 fn plot_maker() {
-    match Command::new("python").arg("graph.py").status() {
+    let exe_path = match std::env::current_exe() {
+        Ok(path) => path,
+        Err(e) => {
+            eprintln!("Failed to get current executable path: {}", e);
+            return;
+        }
+    };
+
+    let script_path = if let Some(dir) = exe_path.parent() {
+        dir.join("graph.py")
+    } else {
+        eprintln!("Failed to get parent directory of executable");
+        return;
+    };
+
+    match Command::new("python").arg(&script_path).status() {
         Ok(status) => match status.code() {
-            Some(0) => println!("Sucess!"),
-            Some(1) => println!("Python script failed with error"),
-            Some(2) => println!("Script not found"),
+            Some(0) => println!("Success!"),
+            Some(1) => println!("Python script failed with an error. Is '{}' the correct path?", script_path.display()),
             Some(code) => println!("Exited with code: {}", code),
             None => println!("Process terminated by signal"),
         },
-        Err(e) => println!("Failed to execute {}", e),
+        Err(e) => println!("Failed to execute python: {}. Is python in your PATH?", e),
     }
 }
 
