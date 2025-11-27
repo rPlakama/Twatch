@@ -2,8 +2,9 @@ use std::{
     fs::{self, File},
     io::{self, Write},
     path::Path,
-    process::Command,
-    thread, time,
+    process::{Command, Stdio},
+    thread,
+    time,
 };
 
 pub struct SessionFile {
@@ -145,7 +146,7 @@ fn main() {
             }
 
             _ => {
-                print!(
+                println!(
                     "Argument invalid or not found {} \nCurrent Temperature: {}",
                     arg, cpu_temp
                 )
@@ -321,9 +322,9 @@ fn session_selector(arg_passers: &mut ArgumentPassers) -> io::Result<()> {
 
     if found_session {
         arg_passers.session_exists = found_session;
-        println!("Found session");
+        println!("Session folder exists in current PATH");
     } else {
-        println!("Session not found");
+        println!("Session folder not found in current PATH");
     }
 
     Ok(())
