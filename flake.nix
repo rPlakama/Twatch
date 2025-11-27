@@ -45,8 +45,7 @@
           ];
 
           shellHook = ''
-	  rustc --version \ 
-	  rust-analyzer --version \
+	  fish
           '';
         };
     });
