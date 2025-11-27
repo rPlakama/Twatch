@@ -3,7 +3,6 @@ use std::{
     io::{self, Write},
     path::Path,
     process::Command,
-    thread, time,
 };
 
 pub struct SessionFile {
@@ -20,9 +19,10 @@ pub struct SensorLabel {
 
 pub struct ArgumentPassers {
     pub is_by_temperature: bool,
+    pub is_by_capture: bool,
     pub plot_latest: bool,
     pub ms_delay: u64,
-    pub amount_captures: i16,
+    pub amount_captures: u64,
     pub initial_temperature: u32,
     pub end_temperature: u32,
     pub session_exists: bool,
@@ -30,7 +30,7 @@ pub struct ArgumentPassers {
 
 fn record_frame(
     session: &mut SessionFile,
-    countdown: usize,
+    countdown: u64,
     header_msg: &str,
 ) -> std::io::Result<Vec<SensorLabel>> {
     let sensors = search_sensors()?;
@@ -73,24 +73,37 @@ fn device_type(sensor: &SensorLabel) -> &'static str {
 }
 
 fn args_processor(passers: &ArgumentPassers) {
-    if passers.is_by_temperature {
-        if let Err(e) = trigger_by_temperature(passers) {
-            eprintln!("Error during temperature monitoring: {}", e);
+    match (
+        passers.is_by_temperature,
+        passers.is_by_capture,
+        passers.plot_latest,
+        passers.session_exists,
+    ) {
+        (true, false, _, false) => {
+            if let Err(e) = trigger_by_temperature(passers) {
+                eprintln!("Error during temperature monitoring: {}", e);
+            }
         }
-    } else if passers.plot_latest {
-        if passers.session_exists {
+        (false, true, _, _) => {
+            if let Err(e) = by_capture_limit(passers) {
+                eprintln!("Error during the monitoring: {}", e);
+            }
+        }
+        (_, true, _, _) => {
             plot_maker();
-        } else {
+        }
+        (_, _, true, _) => {
             println!("Unable to find session file, do a capture first.");
         }
+        _ => {}
     }
 }
-
 fn main() {
     let mut args = std::env::args().skip(1);
 
     let mut arg_passers = ArgumentPassers {
         is_by_temperature: false,
+        is_by_capture: false,
         ms_delay: 250,
         amount_captures: 250,
         plot_latest: false,
@@ -144,11 +157,11 @@ fn main() {
             "-ct" | "--current-temperature" => {
                 println!("CPU TEMP: {}C", cpu_temp);
             }
+            "-bl" | "--by-capture-limit" => {
+                arg_passers.is_by_capture = true;
+            }
             _ => {
-                println!(
-                    "Argument invalid or not found {} \nCurrent Temperature: {}",
-                    arg, cpu_temp
-                )
+                println!("Argument invalid or not found {}", arg)
             }
         }
     }
@@ -228,17 +241,6 @@ fn session_writter() -> std::io::Result<SessionFile> {
     }
 }
 
-fn sensor_loop() -> std::io::Result<()> {
-    let mut session = session_writter()?;
-    let mut countdown = 0;
-
-    loop {
-        countdown += 1;
-        record_frame(&mut session, countdown, "--- Sensor Monitor ---")?;
-        thread::sleep(time::Duration::from_millis(250));
-    }
-}
-
 fn trigger_by_temperature(passers: &ArgumentPassers) -> std::io::Result<()> {
     print!("\r\x1B[2J\x1B[1;1H");
     let mut session = session_writter()?;
@@ -278,37 +280,13 @@ fn trigger_by_temperature(passers: &ArgumentPassers) -> std::io::Result<()> {
         if cpu_temp > passers.end_temperature {
             println!("\x1B[31m Limit reached ({}°C).\x1B[0m", cpu_temp);
             writeln!(session.file, "CPU,Exit,{}", cpu_temp)?;
-            _plot_flag = true;
+            plot_maker();
             break;
         }
         std::thread::sleep(std::time::Duration::from_millis(passers.ms_delay));
     }
-    if _plot_flag {
-        plot_maker();
-    }
     Ok(())
 }
-fn trigger_by_timeout(amount: i16, delay: u64) -> std::io::Result<()> {
-    let mut session = session_writter()?;
-
-    for i in 1.. {
-        print!("\x1B[2J");
-        let header = format!("\r-- By capture limit -- \n Target: {} frames \n", amount);
-
-        record_frame(&mut session, i as usize, &header)?;
-
-        std::thread::sleep(std::time::Duration::from_millis(delay));
-    }
-    println!(
-        "\rCaptures completed, total of {} frames, requesting graph.",
-        amount
-    );
-
-    plot_maker();
-
-    Ok(())
-}
-
 fn session_selector(arg_passers: &mut ArgumentPassers) -> io::Result<()> {
     let entries = fs::read_dir(".")?
         .filter_map(|res| res.ok())
@@ -358,6 +336,46 @@ fn plot_maker() {
     }
 }
 
+fn by_capture_limit(passers: &ArgumentPassers) -> std::io::Result<()> {
+    print!("\r\x1B[2J\x1B[1;1H");
+    let mut session = session_writter()?;
+    let mut countdown = 0;
+    let mut _plot_flag = false;
+    print!("\x1B[2J");
+
+    loop {
+        print!("\r\x1B[2J\x1B[1;1H");
+
+        countdown += 1;
+
+        let status_header = format!(
+            "--- Trigger Monitor ---\nCurrent: [{}] Target: [{}]\n",
+            countdown, passers.amount_captures
+        );
+
+        let sensors = record_frame(&mut session, countdown, &status_header)?;
+
+        let cpu_temp = sensors
+            .iter()
+            .find(|s| s.is_cpu)
+            .map(|s| s.temp)
+            .unwrap_or(0);
+
+        println!("\nStatus:");
+
+        if countdown > passers.amount_captures {
+            println!(
+                "\x1B[31m Target reached ([{}]).\x1B[0m",
+                passers.amount_captures
+            );
+            writeln!(session.file, "CPU,Exit,{}", cpu_temp)?;
+            plot_maker();
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(passers.ms_delay));
+    }
+    Ok(())
+}
 fn help() {
     println!(
         "\n
