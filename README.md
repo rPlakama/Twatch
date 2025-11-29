@@ -1,4 +1,4 @@
-# How does it works? 
+#How does it works? 
 
 - Twatch currently works by capturing HWMON devices using Rust and creates a file, which Python does create an plot.
 
@@ -7,6 +7,7 @@
 
 #![First](./examples/1.png) 
 #![Second](./examples/2.png) 
+
 
 TODO:
 
