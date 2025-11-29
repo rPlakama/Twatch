@@ -1,3 +1,14 @@
+# How does it works? 
+
+- Twatch currently works by capturing HWMON devices using Rust and creates a file, which Python does create an plot.
+
+
+# Graphic Examples:
+
+#![First](./examples/1.png) 
+#![First](./examples/2.png) 
+#![First](./examples/3.png) 
+
 TODO:
 
 - Making the prints cleaner 
