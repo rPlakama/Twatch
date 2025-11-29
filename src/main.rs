@@ -110,13 +110,13 @@ fn main() {
         session_exists: false,
     };
 
-    let sensors = search_sensors().unwrap_or_default();
+    let sensors = search_sensors().expect("Unable to receive sensors information");
 
     let cpu_temp = sensors
         .iter()
         .find(|s| s.is_cpu)
         .map(|s| s.temp)
-        .unwrap_or(0);
+        .expect("Unable to read cpu temperature");
     while let Some(arg) = args.next() {
         match &arg[..] {
             "-bt" | "--by-temperature" => {
@@ -158,6 +158,9 @@ fn main() {
             "-bl" | "--by-capture-limit" => {
                 arg_passers.is_by_capture = true;
             }
+            "-ci" => {
+                power_usage();
+            }
             _ => {
                 println!("Argument invalid or not found {}", arg)
             }
@@ -193,7 +196,7 @@ fn search_sensors() -> std::io::Result<Vec<SensorLabel>> {
 
     for path in hwmon_paths {
         let device_name = fs::read_to_string(path.join("name"))
-            .unwrap_or_default()
+            .expect("Unable to read_to_string in hwmon path")
             .trim()
             .to_string();
         let is_nvme = device_name.contains("nvme");
@@ -204,7 +207,8 @@ fn search_sensors() -> std::io::Result<Vec<SensorLabel>> {
             for entry in entries.filter_map(Result::ok) {
                 let file_name = entry.file_name().to_string_lossy().to_string();
                 if file_name.starts_with("temp") && file_name.ends_with("_input") {
-                    let temp_string = fs::read_to_string(entry.path()).unwrap_or_default();
+                    let temp_string =
+                        fs::read_to_string(entry.path()).expect("Unable to entry.path");
                     let temp_value: u32 = temp_string.trim().parse().unwrap_or(0) / 1000;
                     let label_path = entry
                         .path()
@@ -273,7 +277,7 @@ fn trigger_by_temperature(passers: &ArgumentPassers) -> std::io::Result<()> {
             .iter()
             .find(|s| s.is_cpu)
             .map(|s| s.temp)
-            .unwrap_or(0);
+            .expect("Unable to read CPU temperature");
 
         println!("\nStatus:");
 
@@ -368,7 +372,7 @@ fn by_capture_limit(passers: &ArgumentPassers) -> std::io::Result<()> {
             .iter()
             .find(|s| s.is_cpu)
             .map(|s| s.temp)
-            .unwrap_or(0);
+            .expect("Unable to read CPU Temperatures");
 
         if countdown > passers.amount_captures {
             println!(
@@ -382,6 +386,13 @@ fn by_capture_limit(passers: &ArgumentPassers) -> std::io::Result<()> {
         std::thread::sleep(std::time::Duration::from_millis(passers.ms_delay));
     }
     Ok(())
+}
+
+fn power_usage() {
+    let power_input = fs::read_to_string("/sys/class/power_supply/BAT0/power_now")
+        .expect("Unable /sys/class/power_supply/BAT0");
+    let power_int: f32 = power_input.trim().parse().expect("Unable to parse to F32");
+    print!("{:.2}", power_int / 1_000_000.0);
 }
 fn help() {
     println!(
