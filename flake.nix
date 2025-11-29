@@ -6,48 +6,51 @@
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { nixpkgs, flake-utils, ... }:
-    flake-utils.lib.eachDefaultSystem (system:
-      let
-        pkgs = nixpkgs.legacyPackages.${system};
+  outputs = {
+    nixpkgs,
+    flake-utils,
+    ...
+  }:
+    flake-utils.lib.eachDefaultSystem (system: let
+      pkgs = nixpkgs.legacyPackages.${system};
 
-        pythonEnv = pkgs.python3.withPackages (ps: with ps; [
+      pythonEnv = pkgs.python3.withPackages (ps:
+        with ps; [
           matplotlib
-	  pandas
+          pandas
         ]);
-      in
-      {
-        formatter = pkgs.alejandra;
+    in {
+      formatter = pkgs.alejandra;
 
-        packages.default = pkgs.rustPlatform.buildRustPackage {
-          pname = "twatch";
-          version = "0.1.2";
+      packages.default = pkgs.rustPlatform.buildRustPackage {
+        pname = "twatch";
+        version = "0.1.2";
 
-          src = ./.;
+        src = ./.;
 
-          cargoLock.lockFile = ./Cargo.lock;
+        cargoLock.lockFile = ./Cargo.lock;
 
-          nativeBuildInputs = [ pkgs.makeWrapper ];
-          postInstall = ''
-            cp src/graph.py $out/bin/graph.py
-            wrapProgram $out/bin/twatch --prefix PATH : ${pkgs.lib.makeBinPath [ pythonEnv ]}
-          '';
-        };
+        nativeBuildInputs = [pkgs.makeWrapper];
+        postInstall = ''
+          cp src/graph.py $out/bin/graph.py
+          wrapProgram $out/bin/twatch --prefix PATH : ${pkgs.lib.makeBinPath [pythonEnv]}
+        '';
+      };
 
-        devShells.default = pkgs.mkShell {
-          buildInputs = with pkgs; [
-            rustfmt
-            rust-analyzer
-	    ruff
-            cargo
-            rustc
-            gh
-            pythonEnv
-          ];
+      devShells.default = pkgs.mkShell {
+        buildInputs = with pkgs; [
+          rustfmt
+          rust-analyzer
+          ruff
+          cargo
+          rustc
+          gh
+          pythonEnv
+        ];
 
-          shellHook = ''
-	  fish
-          '';
-        };
+        shellHook = ''
+          fish
+        '';
+      };
     });
 }

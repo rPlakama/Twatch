@@ -11,11 +11,10 @@
 
 TODO:
 
-- Making the prints cleaner 
-- Creating a selection list for sessions
+- Making the prints cleaner [70%]
+- Creating a selection list for sessions [0%]
+- Adding the delay timming the graph [0%]
 
-- Making session debugger only spawn in session request
-- Alr alr 
 Secondary:
 
 - Watts monitor

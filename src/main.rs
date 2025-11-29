@@ -263,8 +263,9 @@ fn trigger_by_temperature(passers: &ArgumentPassers) -> std::io::Result<()> {
         countdown += 1;
 
         let status_header = format!(
-            "--- Trigger Monitor ---\nRange: [Start: {}°C, End: {}°C] \n",
-            passers.initial_temperature, passers.end_temperature
+            "--- Trigger Monitor ---\nRange: [Start: {}°C, End: {}°C] \n
+            Delay betwheen captures: {}",
+            passers.initial_temperature, passers.end_temperature, passers.ms_delay
         );
 
         let sensors = record_frame(&mut session, countdown, &status_header)?;
@@ -358,8 +359,9 @@ fn by_capture_limit(passers: &ArgumentPassers) -> std::io::Result<()> {
         countdown += 1;
 
         let status_header = format!(
-            "--- Trigger Monitor ---\nCurrent: [{}] Target: [{}]\n",
-            countdown, passers.amount_captures
+            "--- Trigger Monitor ---\nCurrent: [{}] Target: [{}]\n
+            Delay betwheen captures: {}",
+            countdown, passers.amount_captures, passers.ms_delay
         );
 
         let sensors = record_frame(&mut session, countdown, &status_header)?;
