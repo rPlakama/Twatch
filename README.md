@@ -34,4 +34,4 @@ But, since it uses small depedencies (pandas, and matplotlib). You can copy this
 
 # If I want to Colaborate? 
 
-In case that you want to help this project (Which sucks) feels free, I would be glad!
+In case that you want to help this project (Which sucks) feels free, I would be glad! Make a fork and create an pull request.
