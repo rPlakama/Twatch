@@ -7,7 +7,6 @@
 
 #![First](./examples/1.png) 
 #![Second](./examples/2.png) 
-#![Third](./examples/3.png) 
 
 TODO:
 
