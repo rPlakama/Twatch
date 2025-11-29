@@ -163,6 +163,16 @@ fn main() {
                 println!("Argument invalid or not found {}", arg)
             }
         }
+        if !arg_passers.plot_latest && !arg_passers.is_by_temperature && !arg_passers.is_by_capture
+        {
+            eprintln!(
+                "You must provide one of the key arguments: \n
+                --plot_latest\n
+                --by-capture-limit\n
+                --by-temperature\n"
+            );
+            std::process::exit(1);
+        }
     }
     let _ = session_selector(&mut arg_passers);
     args_processor(&arg_passers);
