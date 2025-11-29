@@ -12,8 +12,8 @@
         pkgs = nixpkgs.legacyPackages.${system};
 
         pythonEnv = pkgs.python3.withPackages (ps: with ps; [
-          pandas
           matplotlib
+	  pandas
         ]);
       in
       {
@@ -21,7 +21,7 @@
 
         packages.default = pkgs.rustPlatform.buildRustPackage {
           pname = "twatch";
-          version = "0.1.0";
+          version = "0.1.2";
 
           src = ./.;
 
@@ -38,6 +38,7 @@
           buildInputs = with pkgs; [
             rustfmt
             rust-analyzer
+	    ruff
             cargo
             rustc
             gh
