@@ -13,7 +13,6 @@ TODO:
 
 - Making the prints cleaner [70%]
 - Creating a selection list for sessions [0%]
-- Adding the delay timming the graph [0%]
 
 Secondary:
 

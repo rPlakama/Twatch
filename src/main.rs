@@ -30,7 +30,7 @@ pub struct ArgumentPassers {
 
 fn record_frame(
     session: &mut SessionFile,
-    countdown: u64,
+    _countdown: u64,
     header_msg: &str,
 ) -> std::io::Result<Vec<SensorLabel>> {
     let sensors = search_sensors()?;
@@ -38,7 +38,6 @@ fn record_frame(
     let mut display_tui: String = Default::default();
 
     display_tui.push_str(&format!("{}", header_msg));
-    display_tui.push_str(&format!("Current Capture: {}", countdown));
 
     for sensor in &sensors {
         let d_type = device_type(sensor);
@@ -228,7 +227,7 @@ fn search_sensors() -> std::io::Result<Vec<SensorLabel>> {
 
     Ok(collected_data)
 }
-fn session_writter() -> std::io::Result<SessionFile> {
+fn session_writter(passers: &ArgumentPassers) -> std::io::Result<SessionFile> {
     let mut session_id = 0;
 
     loop {
@@ -239,6 +238,7 @@ fn session_writter() -> std::io::Result<SessionFile> {
             }
 
             let mut file = File::create(&condidate)?;
+            writeln!(file, "# Delay:{}", passers.ms_delay)?;
             writeln!(file, "Type,Label,Temp")?;
 
             return Ok(SessionFile {
@@ -252,7 +252,7 @@ fn session_writter() -> std::io::Result<SessionFile> {
 
 fn trigger_by_temperature(passers: &ArgumentPassers) -> std::io::Result<()> {
     print!("\r\x1B[2J\x1B[1;1H");
-    let mut session = session_writter()?;
+    let mut session = session_writter(passers)?;
     let mut countdown = 0;
     let mut _plot_flag = false;
     print!("\x1B[2J");
@@ -263,9 +263,8 @@ fn trigger_by_temperature(passers: &ArgumentPassers) -> std::io::Result<()> {
         countdown += 1;
 
         let status_header = format!(
-            "--- Trigger Monitor ---\nRange: [Start: {}°C, End: {}°C] \n
-            Delay betwheen captures: {}",
-            passers.initial_temperature, passers.end_temperature, passers.ms_delay
+            "--- Trigger Monitor ---\nRange: [Start: {}°C, End: {}°C]",
+            passers.initial_temperature, passers.end_temperature
         );
 
         let sensors = record_frame(&mut session, countdown, &status_header)?;
@@ -348,7 +347,7 @@ fn plot_maker() {
 
 fn by_capture_limit(passers: &ArgumentPassers) -> std::io::Result<()> {
     print!("\r\x1B[2J\x1B[1;1H");
-    let mut session = session_writter()?;
+    let mut session = session_writter(passers)?;
     let mut countdown = 0;
     let mut _plot_flag = false;
     print!("\x1B[2J");
@@ -359,9 +358,8 @@ fn by_capture_limit(passers: &ArgumentPassers) -> std::io::Result<()> {
         countdown += 1;
 
         let status_header = format!(
-            "--- Trigger Monitor ---\nCurrent: [{}] Target: [{}]\n
-            Delay betwheen captures: {}",
-            countdown, passers.amount_captures, passers.ms_delay
+            "--- Trigger Monitor ---\nCurrent: [{}] Target: [{}]\n",
+            countdown, passers.amount_captures
         );
 
         let sensors = record_frame(&mut session, countdown, &status_header)?;
