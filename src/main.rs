@@ -28,6 +28,11 @@ pub struct ArgumentPassers {
     pub session_exists: bool,
 }
 
+pub struct SessionType {
+    pub is_power: bool,
+    pub is_temperature: bool,
+}
+
 fn record_frame(
     session: &mut SessionFile,
     _countdown: u64,
@@ -71,34 +76,37 @@ fn device_type(sensor: &SensorLabel) -> &'static str {
     }
 }
 
-fn args_processor(passers: &ArgumentPassers) {
-    match (
-        passers.is_by_temperature,
-        passers.is_by_capture,
-        passers.plot_latest,
-        passers.session_exists,
-    ) {
-        (true, false, _, false) => {
-            if let Err(e) = trigger_by_temperature(passers) {
-                eprintln!("Error during temperature monitoring: {}", e);
-            }
+fn args_processor(session_type: &SessionType, passers: &ArgumentPassers) {
+    if session_type.is_power && passers.is_by_capture && !session_type.is_temperature {
+        if let Err(e) = power_usage(passers) {
+            eprintln!("Error during power monitoring: {}", e);
         }
-        (false, true, _, _) => {
-            if let Err(e) = by_capture_limit(passers) {
-                eprintln!("Error during the monitoring: {}", e);
-            }
+    } else if session_type.is_temperature
+        && passers.is_by_temperature
+        && !session_type.is_power
+        && !passers.is_by_capture
+        && !passers.session_exists
+    {
+        if let Err(e) = trigger_by_temperature(passers) {
+            eprintln!("Error during temperature monitoring: {}", e);
         }
-        (_, _, true, _) => {
-            plot_maker();
+    } else if !passers.is_by_temperature && passers.is_by_capture {
+        if let Err(e) = by_capture_limit(passers) {
+            eprintln!("Error during the monitoring: {}", e);
         }
-        (_, _, false, _) => {
-            println!("Unable to find session file, do a capture first.");
-        }
+    } else if passers.plot_latest {
+        plot_maker();
+    } else if !passers.session_exists {
+        println!("Unable to find session file, do a capture first.");
     }
 }
 fn main() {
     let mut args = std::env::args().skip(1);
 
+    let mut session_type = SessionType {
+        is_power: false,
+        is_temperature: false,
+    };
     let mut arg_passers = ArgumentPassers {
         is_by_temperature: false,
         is_by_capture: false,
@@ -120,6 +128,7 @@ fn main() {
     while let Some(arg) = args.next() {
         match &arg[..] {
             "-bt" | "--by-temperature" => {
+                session_type.is_temperature = true;
                 arg_passers.is_by_temperature = true;
             }
             "-h" | "--help" => {
@@ -158,8 +167,8 @@ fn main() {
             "-bl" | "--by-capture-limit" => {
                 arg_passers.is_by_capture = true;
             }
-            "-ci" => {
-                power_usage();
+            "-mw" | "--monitoring-watts" => {
+                session_type.is_power = true;
             }
             _ => {
                 println!("Argument invalid or not found {}", arg)
@@ -177,7 +186,7 @@ fn main() {
         }
     }
     let _ = session_selector(&mut arg_passers);
-    args_processor(&arg_passers);
+    args_processor(&session_type, &arg_passers);
 }
 
 fn search_sensors() -> std::io::Result<Vec<SensorLabel>> {
@@ -387,12 +396,17 @@ fn by_capture_limit(passers: &ArgumentPassers) -> std::io::Result<()> {
     }
     Ok(())
 }
-
-fn power_usage() {
+fn power_usage(passers: &ArgumentPassers) -> std::io::Result<()> {
     let power_input = fs::read_to_string("/sys/class/power_supply/BAT0/power_now")
-        .expect("Unable /sys/class/power_supply/BAT0");
-    let power_int: f32 = power_input.trim().parse().expect("Unable to parse to F32");
-    print!("{:.2}", power_int / 1_000_000.0);
+        .map_err(|e| io::Error::new(io::ErrorKind::NotFound, format!("BAT0 not found: {}", e)))?;
+    let power_int: f32 = power_input.trim().parse().map_err(|e| {
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("Failed to parse power: {}", e),
+        )
+    })?;
+    println!("Power usage: {:.2}W", power_int / 1_000_000.0);
+    Ok(())
 }
 fn help() {
     println!(
