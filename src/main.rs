@@ -3,6 +3,7 @@ use std::{
     io::{self, Write},
     path::Path,
     process::Command,
+    time::Instant,
 };
 
 pub struct SessionFile {
@@ -39,7 +40,6 @@ fn record_frame(
     header_msg: &str,
 ) -> std::io::Result<Vec<SensorLabel>> {
     let sensors = search_sensors()?;
-
     let mut display_tui: String = Default::default();
 
     display_tui.push_str(&format!("{}", header_msg));
@@ -117,6 +117,7 @@ fn main() {
         session_exists: false,
     };
 
+    let mut help_called = false;
     let sensors = search_sensors().expect("Unable to receive sensors information");
 
     let cpu_temp = sensors
@@ -131,6 +132,7 @@ fn main() {
                 arg_passers.is_by_temperature = true;
             }
             "-h" | "--help" => {
+                help_called = true;
                 help();
             }
             "-pl" | "--plot-latest" => {
@@ -169,10 +171,12 @@ fn main() {
                 println!("Argument invalid or not found {}", arg)
             }
         }
+
         if !session_type.is_power
             && !arg_passers.plot_latest
             && !arg_passers.is_by_temperature
             && !arg_passers.is_by_capture
+            && !help_called
         {
             eprintln!(
                 "You must provide one of the key arguments: \n
@@ -266,9 +270,9 @@ fn trigger_by_temperature(passers: &ArgumentPassers) -> std::io::Result<()> {
     print!("\r\x1B[2J\x1B[1;1H");
     let mut session = session_writter(passers)?;
     let mut countdown = 0;
-    let mut _plot_flag = false;
     print!("\x1B[2J");
 
+    let total_start = Instant::now();
     loop {
         print!("\r\x1B[2J\x1B[1;1H");
 
@@ -300,6 +304,11 @@ fn trigger_by_temperature(passers: &ArgumentPassers) -> std::io::Result<()> {
 
         if cpu_temp > passers.end_temperature {
             println!("\x1B[31m Limit reached ({}°C).\x1B[0m", cpu_temp);
+            writeln!(
+                session.file,
+                "#Total: {:.3}",
+                total_start.elapsed().as_secs()
+            )?;
             writeln!(session.file, "CPU,Exit,{}", cpu_temp)?;
             plot_maker();
             break;
@@ -361,9 +370,9 @@ fn by_capture_limit(passers: &ArgumentPassers) -> std::io::Result<()> {
     print!("\r\x1B[2J\x1B[1;1H");
     let mut session = session_writter(passers)?;
     let mut countdown = 0;
-    let mut _plot_flag = false;
     print!("\x1B[2J");
 
+    let total_start = Instant::now();
     loop {
         print!("\r\x1B[2J\x1B[1;1H");
 
@@ -382,11 +391,16 @@ fn by_capture_limit(passers: &ArgumentPassers) -> std::io::Result<()> {
             .map(|s| s.temp)
             .expect("Unable to read CPU Temperatures");
 
-        if countdown > passers.amount_captures {
+        if countdown >= passers.amount_captures {
             println!(
-                "\x1B[31m Target reached ([{}]).\x1B[0m",
+                "\n\x1B[31mTarget reached: [{}]\n\x1B[0m",
                 passers.amount_captures
             );
+            writeln!(
+                session.file,
+                "#Total: {:.3}",
+                total_start.elapsed().as_secs()
+            )?;
             writeln!(session.file, "CPU,Exit,{}", cpu_temp)?;
             plot_maker();
             break;
@@ -421,6 +435,7 @@ fn help() {
     -ct | --current-temperature \n
     -bw | --by-watts \n
     -h  | --help \n 
+This program can also handle crashes or being unable to reache a certain target. \nThe writes are direct to the file instead of a buffer, therefore, you can run extreme \nthings without caring if it will save at all. 
     "
     );
 }
