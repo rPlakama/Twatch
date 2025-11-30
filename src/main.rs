@@ -77,7 +77,7 @@ fn device_type(sensor: &SensorLabel) -> &'static str {
 }
 
 fn args_processor(session_type: &SessionType, passers: &ArgumentPassers) {
-    if session_type.is_power && passers.is_by_capture && !session_type.is_temperature {
+    if session_type.is_power && !session_type.is_temperature {
         if let Err(e) = power_usage(passers) {
             eprintln!("Error during power monitoring: {}", e);
         }
@@ -85,7 +85,6 @@ fn args_processor(session_type: &SessionType, passers: &ArgumentPassers) {
         && passers.is_by_temperature
         && !session_type.is_power
         && !passers.is_by_capture
-        && !passers.session_exists
     {
         if let Err(e) = trigger_by_temperature(passers) {
             eprintln!("Error during temperature monitoring: {}", e);
@@ -140,10 +139,6 @@ fn main() {
             "-d" | "--delay" => {
                 if let Some(val_str) = args.next() {
                     arg_passers.ms_delay = val_str.parse().unwrap_or(250);
-                    println!("You are missing arguments");
-                } else {
-                    eprintln!("Error: -d | --d requires (value) in (ms)");
-                    return;
                 }
             }
             "-c" | "--captures" => {
@@ -167,18 +162,22 @@ fn main() {
             "-bl" | "--by-capture-limit" => {
                 arg_passers.is_by_capture = true;
             }
-            "-mw" | "--monitoring-watts" => {
+            "-bw" | "--by-watts" => {
                 session_type.is_power = true;
             }
             _ => {
                 println!("Argument invalid or not found {}", arg)
             }
         }
-        if !arg_passers.plot_latest && !arg_passers.is_by_temperature && !arg_passers.is_by_capture
+        if !session_type.is_power
+            && !arg_passers.plot_latest
+            && !arg_passers.is_by_temperature
+            && !arg_passers.is_by_capture
         {
             eprintln!(
                 "You must provide one of the key arguments: \n
                 --plot_latest\n
+                --by-watts \n
                 --by-capture-limit\n
                 --by-temperature\n"
             );
@@ -405,13 +404,13 @@ fn power_usage(passers: &ArgumentPassers) -> std::io::Result<()> {
             format!("Failed to parse power: {}", e),
         )
     })?;
-    println!("Power usage: {:.2}W", power_int / 1_000_000.0);
+    println!("Current watts: {:.2}W", power_int / 1_000_000.0);
     Ok(())
 }
 fn help() {
     println!(
         "\n
-        Current options are: \n 
+    Current options are: \n 
     -bt | --by-temperature \n
     -bl | --by-capture-limit \n
     -it | --initial_temperature \n
@@ -420,6 +419,7 @@ fn help() {
     -d  | --delay \n
     -c  | --captures \n
     -ct | --current-temperature \n
+    -bw | --by-watts \n
     -h  | --help \n 
     "
     );
