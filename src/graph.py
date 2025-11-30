@@ -23,15 +23,20 @@ else:
     else:
         df = pd.read_csv(target_file)
 
+    # NEW: Calculate number of unique sensors
+    n_sensors = len(df.groupby(["Type", "Label"]).groups)
+    
     plt.figure(figsize=(12, 6))
 
     for (t, label), group in df.groupby(["Type", "Label"]):
-        plt.plot(group.index, group["Temp"], label=f"{t}-{label}")
+        # NEW: Use iteration count (index // n_sensors) instead of raw index
+        iteration_x = group.index // n_sensors
+        plt.plot(iteration_x, group["Temp"], label=f"{t}-{label}")
 
     plt.axhspan(70, 80, alpha=0.05, color="orange", label="Warm")
     plt.axhspan(80, 100, alpha=0.05, color="red", label="Critical")
 
-    plt.xlabel("Captures")
+    plt.xlabel("Iterations")  # CHANGED: More accurate label
     plt.ylabel("Temperature (°C)")
 
     plt.title(f"HWMON Devices Temperature (Delay: {capture_delay}ms)")
