@@ -11,11 +11,15 @@
 
 TODO:
 
-- Creating a selection list for sessions [0%]
+- Watts monitor [ Currently able to capture and format to watts ]
+-> Needs to add session writting for this type of collection.
+-> Needs to create an way to python reconize POSIX flags to the command can be executed aproperly based on the type of session
+-> System to exclude or add devices based also on POSIX flags for Python (That can managed with the Rust execution, easy)
+
 
 Secondary:
 
-- Watts monitor
+- Creating a selection list for sessions [0%]
 - Power usage monitor
 - More detailed graphs
 - extensive selection for devices
