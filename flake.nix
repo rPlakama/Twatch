@@ -38,18 +38,19 @@
       };
 
       devShells.default = pkgs.mkShell {
+        nativeBuildInputs = with pkgs; [
+          pythonEnv
+          cargo
+        ];
         buildInputs = with pkgs; [
           rustfmt
           rust-analyzer
           ruff
-          cargo
           rustc
           gh
-          pythonEnv
         ];
 
         shellHook = ''
-          fish
         '';
       };
     });

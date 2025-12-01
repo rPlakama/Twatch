@@ -299,7 +299,7 @@ fn trigger_by_temperature(passers: &ArgumentPassers) -> std::io::Result<()> {
                 cpu_temp, passers.initial_temperature
             );
         } else {
-            println!("Trigger to be reached...");
+            println!("Bellow Target");
         }
 
         if cpu_temp > passers.end_temperature {
@@ -435,7 +435,6 @@ fn help() {
     -ct | --current-temperature \n
     -bw | --by-watts \n
     -h  | --help \n 
-This program can also handle crashes or being unable to reache a certain target. \nThe writes are direct to the file instead of a buffer, therefore, you can run extreme \nthings without caring if it will save at all. 
     "
     );
 }
