@@ -33,8 +33,8 @@ pub struct ArgumentPassers {
 pub struct SessionType {
     pub is_power: bool,
     pub is_temperature: bool,
-    pub have_capture_limit: bool,
-    pub have_temperature_limit: bool,
+   //pub have_capture_limit: bool,
+   //pub have_temperature_limit: bool,
 // Vai ficar no Todo mesmo meu filho que to com aquela força de vontade enorme!
 }
 
@@ -380,6 +380,7 @@ fn by_capture_limit(passers: &ArgumentPassers) -> std::io::Result<()> {
     loop {
         print!("\r\x1B[2J\x1B[1;1H");
 
+
         countdown += 1;
 
         let status_header = format!(
@@ -397,7 +398,7 @@ fn by_capture_limit(passers: &ArgumentPassers) -> std::io::Result<()> {
 
         if countdown >= passers.amount_captures {
             println!(
-                "\n\x1B[31mTarget reached: [{}]\n\x1B[0m",
+                "\n\x1B[31mTarget reached: [{}]\x1B[0m",
                 passers.amount_captures
             );
             writeln!(
