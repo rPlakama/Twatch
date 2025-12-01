@@ -11,11 +11,7 @@
 
 TODO:
 
-- Watts monitor [ Currently able to capture and format to watts ]
--> Needs to add session writting for this type of collection.
--> Needs to create an way to python reconize POSIX flags to the command can be executed aproperly based on the type of session
--> System to exclude or add devices based also on POSIX flags for Python (That can managed with the Rust execution, easy)
-
+- Making flags interact with other stuff, per example, setting a capture limit while having by-temperature trigger, creating a 'or hit max temperature, or the program kills itself'
 
 Secondary:
 
@@ -32,6 +28,7 @@ Currently, the project is based on Nix, which you can have a temporary shell wit
 
 But, since it uses small depedencies (pandas, and matplotlib). You can copy this repo with a mere clone. 
 
+(Since the development flake paramenters, the main.rs won't be able to pull the graph. For testing, you need to execute ```python graph.py``` in your shell.)
 
 # If I want to Colaborate? 
 

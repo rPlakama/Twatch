@@ -29,9 +29,13 @@ pub struct ArgumentPassers {
     pub session_exists: bool,
 }
 
+
 pub struct SessionType {
     pub is_power: bool,
     pub is_temperature: bool,
+    pub have_capture_limit: bool,
+    pub have_temperature_limit: bool,
+// Vai ficar no Todo mesmo meu filho que to com aquela força de vontade enorme!
 }
 
 fn record_frame(
