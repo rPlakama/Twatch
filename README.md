@@ -11,7 +11,7 @@
 
 TODO:
 
-- Making flags interact with other stuff, per example, setting a capture limit while having by-temperature trigger, creating a 'or hit max temperature, or the program kills itself'
+- Hybrid POSIX flags 
 
 Secondary:
 

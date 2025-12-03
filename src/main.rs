@@ -51,6 +51,11 @@ fn record_frame(
     for sensor in &sensors {
         let d_type = device_type(sensor);
 
+        if d_type == "Unknown" {
+            continue;
+        }
+        // Can be implemented a posix flag 
+
         println!("");
         display_tui.push_str(&format!(
             "\n [{}] {}: {}°C",
