@@ -12,6 +12,7 @@
 TODO:
 
 - Hybrid POSIX flags 
+- Making show-hidden-posix (smth in line 70 or whatever)
 
 Secondary:
 
