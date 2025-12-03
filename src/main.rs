@@ -9,6 +9,8 @@ use std::{
 pub struct SessionFile {
     pub id: u32,
     pub file: File,
+    pub buffer: Vec<String>,
+    pub flush_interval: usize,
 }
 pub struct SensorLabel {
     pub label: String,
@@ -62,17 +64,34 @@ fn record_frame(
             d_type, sensor.label, sensor.temp
         ));
 
-        writeln!(session.file, "{},{},{}", d_type, sensor.label, sensor.temp)?;
+        session.buffer.push(format!("{},{},{}", d_type, sensor.label, sensor.temp));
+    }
+
+    if session.buffer.len() >= session.flush_interval {
+        for line in &session.buffer {
+            writeln!(session.file, "{}", line)?;
+        }
+        session.file.flush()?;
+        session.buffer.clear();
     }
 
     display_tui.push_str("\x1B[J");
-
     println!("{}", display_tui);
-
-    session.file.flush()?;
 
     Ok(sensors)
 }
+
+fn flush_session_buffer(session: &mut SessionFile) -> std::io::Result<()> {
+    if !session.buffer.is_empty() {
+        for line in &session.buffer {
+            writeln!(session.file, "{}", line)?;
+        }
+        session.file.flush()?;
+        session.buffer.clear();
+    }
+    Ok(())
+}
+
 fn device_type(sensor: &SensorLabel) -> &'static str {
     if sensor.is_cpu {
         "CPU"
@@ -269,6 +288,8 @@ fn session_writter(passers: &ArgumentPassers) -> std::io::Result<SessionFile> {
             return Ok(SessionFile {
                 id: session_id,
                 file: file,
+                buffer: Vec::with_capacity(50), 
+                flush_interval: 5,
             });
         }
         session_id += 1;
