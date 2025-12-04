@@ -8,14 +8,12 @@
 #![First](./examples/1.png) 
 #![Second](./examples/2.png) 
 
-
-TODO:
+Firstly: 
+- Making it run in GTK4 instead of... ): python
+Secondary:
 
 - Hybrid POSIX flags 
 - Making show-hidden-posix (smth in line 70 or whatever)
-
-Secondary:
-
 - Creating a selection list for sessions [0%]
 - Power usage monitor
 - More detailed graphs
