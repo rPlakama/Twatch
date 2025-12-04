@@ -188,7 +188,7 @@ fn main() {
                 session_type.is_power = true;
             }
             "-wl" | "--window-test" => {
-                window_gtk();
+                plot_maker();
                 session_type.is_generic = true;
             }
             _ => {
@@ -441,8 +441,7 @@ fn on_activate(application: &Application) {
         .default_height(300)
         .build();
 
-    let button = Button::with_label("Hello World!");
-
+    let button = Button::with_label("Nothing to see here");
     window.set_child(Some(&button));
 
     window.present();
@@ -450,10 +449,9 @@ fn on_activate(application: &Application) {
 
 fn plot_maker() {
     let app = Application::builder()
-        .application_id("twatch_application_graph")
+        .application_id("twatch_graph")
         .build();
 
     app.connect_activate(on_activate);
-
     app.run_with_args(&Vec::<String>::new());
 }
