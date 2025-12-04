@@ -13,46 +13,37 @@
   }:
     flake-utils.lib.eachDefaultSystem (system: let
       pkgs = nixpkgs.legacyPackages.${system};
-
-      pythonEnv = pkgs.python3.withPackages (ps:
-        with ps; [
-          matplotlib
-          pandas
-        ]);
     in {
       formatter = pkgs.alejandra;
 
       packages.default = pkgs.rustPlatform.buildRustPackage {
         pname = "twatch";
-        version = "0.1.2";
+        version = "0.1.5";
 
         src = ./.;
 
         cargoLock.lockFile = ./Cargo.lock;
-
-        nativeBuildInputs = [pkgs.makeWrapper];
-        postInstall = ''
-          cp src/graph.py $out/bin/graph.py
-          wrapProgram $out/bin/twatch --prefix PATH : ${pkgs.lib.makeBinPath [pythonEnv]}
-        '';
+        nativeBuildInputs = with pkgs; [
+          pkg-config
+          gtk4
+        ];
       };
 
       devShells.default = pkgs.mkShell {
         nativeBuildInputs = with pkgs; [
-          pythonEnv
           cargo
-	  pkg-config
+          pkg-config
         ];
         buildInputs = with pkgs; [
           rustfmt
           rust-analyzer
-          ruff
           rustc
-	  gtk4
+          gtk4
           gh
         ];
 
         shellHook = ''
+          rustc --version; rust-analyzer --version; gtk4 --version; gh --version; cargo --version; echo "Loaded!"; fish
         '';
       };
     });
