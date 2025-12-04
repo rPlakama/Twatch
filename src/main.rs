@@ -441,9 +441,6 @@ fn on_activate(application: &Application) {
         .default_height(300)
         .build();
 
-    let button = Button::with_label("Nothing to see here");
-    window.set_child(Some(&button));
-
     window.present();
 }
 
