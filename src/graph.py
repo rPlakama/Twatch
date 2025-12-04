@@ -65,7 +65,7 @@ if total_sec != "Unknown":
     if total_sec < 60:
         title_str += f"\nTotal Duration: {total_sec}s"
     else:
-        title_str += f"\nTotal Duration: {total_sec / 60}m"
+        title_str += f"\nTotal Duration: {total_sec // 60}m {total_sec - 60}s"
 
 if delay_val != "Unknown":
     title_str += f" | Delay: {delay_val}ms"

@@ -82,17 +82,6 @@ fn record_frame(
     Ok(sensors)
 }
 
-fn flush_session_buffer(session: &mut SessionFile) -> std::io::Result<()> {
-    if !session.buffer.is_empty() {
-        for line in &session.buffer {
-            writeln!(session.file, "{}", line)?;
-        }
-        session.file.flush()?;
-        session.buffer.clear();
-    }
-    Ok(())
-}
-
 fn device_type(sensor: &SensorLabel) -> &'static str {
     if sensor.is_cpu {
         "CPU"
@@ -107,7 +96,7 @@ fn device_type(sensor: &SensorLabel) -> &'static str {
 
 fn args_processor(session_type: &SessionType, passers: &ArgumentPassers) {
     if session_type.is_power && !session_type.is_temperature {
-        if let Err(e) = power_usage(passers) {
+        if let Err(e) = power_usage() {
             eprintln!("Error during power monitoring: {}", e);
         }
     } else if session_type.is_temperature
@@ -290,7 +279,7 @@ fn session_writter(passers: &ArgumentPassers) -> std::io::Result<SessionFile> {
                 id: session_id,
                 file: file,
                 buffer: Vec::with_capacity(50),
-                flush_interval: 5,
+                flush_interval: 50,
             });
         }
         session_id += 1;
@@ -301,7 +290,6 @@ fn trigger_by_temperature(passers: &ArgumentPassers) -> std::io::Result<()> {
     print!("\r\x1B[2J\x1B[1;1H");
     let mut session = session_writter(passers)?;
     let mut countdown = 0;
-    print!("\x1B[2J");
 
     let total_start = Instant::now();
     loop {
@@ -368,22 +356,38 @@ fn session_selector(arg_passers: &mut ArgumentPassers) -> io::Result<()> {
 }
 
 fn plot_maker() {
-    if Path::new("./graph.py").exists() {
-        println!("Sucessfully found graph script");
-        Command::new("python")
-            .arg("graph.py")
-            .output()
-            .expect("Failed to execute script");
+    let exe_path = match std::env::current_exe() {
+        Ok(path) => path,
+        Err(e) => {
+            eprintln!("Failed to get current executable path: {}", e);
+            return;
+        }
+    };
+
+    let script_path = if let Some(dir) = exe_path.parent() {
+        dir.join("graph.py")
     } else {
-        println!("graph.py doesnt exists in current directory (developer fault, kill him now)");
+        eprintln!("Failed to get parent directory of executable");
+        return;
+    };
+
+    match Command::new("python").arg(&script_path).status() {
+        Ok(status) => match status.code() {
+            Some(0) => println!("Success!"),
+            Some(1) => println!(
+                "Python script failed with an error. Is '{}' the correct path?",
+                script_path.display()
+            ),
+            Some(code) => println!("Exited with code: {}", code),
+            None => println!("Process terminated by signal"),
+        },
+        Err(e) => println!("Failed to execute python: {}. Is python in your PATH?", e),
     }
 }
 
 fn by_capture_limit(passers: &ArgumentPassers) -> std::io::Result<()> {
-    print!("\r\x1B[2J\x1B[1;1H");
     let mut session = session_writter(passers)?;
     let mut countdown = 0;
-    print!("\x1B[2J");
 
     let total_start = Instant::now();
     loop {
@@ -422,7 +426,7 @@ fn by_capture_limit(passers: &ArgumentPassers) -> std::io::Result<()> {
     }
     Ok(())
 }
-fn power_usage(passers: &ArgumentPassers) -> std::io::Result<()> {
+fn power_usage() -> std::io::Result<()> {
     let power_input = fs::read_to_string("/sys/class/power_supply/BAT0/power_now")
         .map_err(|e| io::Error::new(io::ErrorKind::NotFound, format!("BAT0 not found: {}", e)))?;
     let power_int: f32 = power_input.trim().parse().map_err(|e| {
