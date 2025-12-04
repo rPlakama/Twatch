@@ -41,12 +41,14 @@
         nativeBuildInputs = with pkgs; [
           pythonEnv
           cargo
+	  pkg-config
         ];
         buildInputs = with pkgs; [
           rustfmt
           rust-analyzer
           ruff
           rustc
+	  gtk4
           gh
         ];
 

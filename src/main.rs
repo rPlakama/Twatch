@@ -1,8 +1,11 @@
+use gtk::prelude::*;
+use gtk::{Application, ApplicationWindow, Button};
+use gtk4 as gtk;
+
 use std::{
     fs::{self, File},
     io::{self, Write},
     path::Path,
-    process::Command,
     time::Instant,
 };
 
@@ -34,9 +37,7 @@ pub struct ArgumentPassers {
 pub struct SessionType {
     pub is_power: bool,
     pub is_temperature: bool,
-    //pub have_capture_limit: bool,
-    //pub have_temperature_limit: bool,
-    // Vai ficar no Todo mesmo meu filho que to com aquela força de vontade enorme!
+    pub is_generic: bool,
 }
 
 fn record_frame(
@@ -123,6 +124,7 @@ fn main() {
     let mut session_type = SessionType {
         is_power: false,
         is_temperature: false,
+        is_generic: false,
     };
     let mut arg_passers = ArgumentPassers {
         is_by_temperature: false,
@@ -185,26 +187,31 @@ fn main() {
             "-bw" | "--by-watts" => {
                 session_type.is_power = true;
             }
+            "-wl" | "--window-test" => {
+                window_gtk();
+                session_type.is_generic = true;
+            }
             _ => {
                 println!("Argument invalid or not found {}", arg)
             }
         }
 
-        if !session_type.is_power
-            && !arg_passers.plot_latest
-            && !arg_passers.is_by_temperature
-            && !arg_passers.is_by_capture
-            && !help_called
-        {
-            eprintln!(
-                "You must provide one of the key arguments: \n
-                --plot_latest\n
-                --by-watts \n
-                --by-capture-limit\n
-                --by-temperature\n"
-            );
-            std::process::exit(1);
-        }
+        // if !session_type.is_power
+        //     && !session_type.is_generic
+        //     && !arg_passers.plot_latest
+        //     && !arg_passers.is_by_temperature
+        //     && !arg_passers.is_by_capture
+        //     && !help_called
+        // {
+        //     eprintln!(
+        //         "You must provide one of the key arguments: \n
+        //         --plot_latest\n
+        //         --by-watts \n
+        //         --by-capture-limit\n
+        //         --by-temperature\n"
+        //     );
+        //     std::process::exit(1);
+        // }
     }
     let _ = session_selector(&mut arg_passers);
     args_processor(&session_type, &arg_passers);
@@ -355,36 +362,6 @@ fn session_selector(arg_passers: &mut ArgumentPassers) -> io::Result<()> {
     Ok(())
 }
 
-fn plot_maker() {
-    let exe_path = match std::env::current_exe() {
-        Ok(path) => path,
-        Err(e) => {
-            eprintln!("Failed to get current executable path: {}", e);
-            return;
-        }
-    };
-
-    let script_path = if let Some(dir) = exe_path.parent() {
-        dir.join("graph.py")
-    } else {
-        eprintln!("Failed to get parent directory of executable");
-        return;
-    };
-
-    match Command::new("python").arg(&script_path).status() {
-        Ok(status) => match status.code() {
-            Some(0) => println!("Success!"),
-            Some(1) => println!(
-                "Python script failed with an error. Is '{}' the correct path?",
-                script_path.display()
-            ),
-            Some(code) => println!("Exited with code: {}", code),
-            None => println!("Process terminated by signal"),
-        },
-        Err(e) => println!("Failed to execute python: {}. Is python in your PATH?", e),
-    }
-}
-
 fn by_capture_limit(passers: &ArgumentPassers) -> std::io::Result<()> {
     let mut session = session_writter(passers)?;
     let mut countdown = 0;
@@ -454,4 +431,29 @@ fn help() {
     -h  | --help \n 
     "
     );
+}
+
+fn on_activate(application: &Application) {
+    let window = ApplicationWindow::builder()
+        .application(application)
+        .title("My GTK App")
+        .default_width(300)
+        .default_height(300)
+        .build();
+
+    let button = Button::with_label("Hello World!");
+
+    window.set_child(Some(&button));
+
+    window.present();
+}
+
+fn plot_maker() {
+    let app = Application::builder()
+        .application_id("twatch_application_graph")
+        .build();
+
+    app.connect_activate(on_activate);
+
+    app.run_with_args(&Vec::<String>::new());
 }
