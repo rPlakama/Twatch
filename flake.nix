@@ -25,22 +25,15 @@
       packages.default = pkgs.rustPlatform.buildRustPackage {
         pname = "twatch";
         version = "0.1.2";
-
         src = ./.;
-
         cargoLock.lockFile = ./Cargo.lock;
-
-        nativeBuildInputs = [pkgs.makeWrapper];
-        postInstall = ''
-          cp src/graph.py $out/bin/graph.py
-          wrapProgram $out/bin/twatch --prefix PATH : ${pkgs.lib.makeBinPath [pythonEnv]}
-        '';
+        nativeBuildInputs = [pkgs.pythonEnv];
       };
 
       devShells.default = pkgs.mkShell {
         nativeBuildInputs = with pkgs; [
-          pythonEnv
           cargo
+	  pythonEnv
         ];
         buildInputs = with pkgs; [
           rustfmt

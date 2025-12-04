@@ -31,13 +31,12 @@ pub struct ArgumentPassers {
     pub session_exists: bool,
 }
 
-
 pub struct SessionType {
     pub is_power: bool,
     pub is_temperature: bool,
-   //pub have_capture_limit: bool,
-   //pub have_temperature_limit: bool,
-// Vai ficar no Todo mesmo meu filho que to com aquela força de vontade enorme!
+    //pub have_capture_limit: bool,
+    //pub have_temperature_limit: bool,
+    // Vai ficar no Todo mesmo meu filho que to com aquela força de vontade enorme!
 }
 
 fn record_frame(
@@ -56,7 +55,7 @@ fn record_frame(
         if d_type == "Unknown" {
             continue;
         }
-        // Can be implemented a posix flag 
+        // Can be implemented a posix flag
 
         println!("");
         display_tui.push_str(&format!(
@@ -64,7 +63,9 @@ fn record_frame(
             d_type, sensor.label, sensor.temp
         ));
 
-        session.buffer.push(format!("{},{},{}", d_type, sensor.label, sensor.temp));
+        session
+            .buffer
+            .push(format!("{},{},{}", d_type, sensor.label, sensor.temp));
     }
 
     if session.buffer.len() >= session.flush_interval {
@@ -288,7 +289,7 @@ fn session_writter(passers: &ArgumentPassers) -> std::io::Result<SessionFile> {
             return Ok(SessionFile {
                 id: session_id,
                 file: file,
-                buffer: Vec::with_capacity(50), 
+                buffer: Vec::with_capacity(50),
                 flush_interval: 5,
             });
         }
@@ -367,32 +368,14 @@ fn session_selector(arg_passers: &mut ArgumentPassers) -> io::Result<()> {
 }
 
 fn plot_maker() {
-    let exe_path = match std::env::current_exe() {
-        Ok(path) => path,
-        Err(e) => {
-            eprintln!("Failed to get current executable path: {}", e);
-            return;
-        }
-    };
-
-    let script_path = if let Some(dir) = exe_path.parent() {
-        dir.join("graph.py")
+    if Path::new("./graph.py").exists() {
+        println!("Sucessfully found graph script");
+        Command::new("python")
+            .arg("graph.py")
+            .output()
+            .expect("Failed to execute script");
     } else {
-        eprintln!("Failed to get parent directory of executable");
-        return;
-    };
-
-    match Command::new("python").arg(&script_path).status() {
-        Ok(status) => match status.code() {
-            Some(0) => println!("Success!"),
-            Some(1) => println!(
-                "Python script failed with an error. Is '{}' the correct path?",
-                script_path.display()
-            ),
-            Some(code) => println!("Exited with code: {}", code),
-            None => println!("Process terminated by signal"),
-        },
-        Err(e) => println!("Failed to execute python: {}. Is python in your PATH?", e),
+        println!("graph.py doesnt exists in current directory (developer fault, kill him now)");
     }
 }
 
@@ -405,7 +388,6 @@ fn by_capture_limit(passers: &ArgumentPassers) -> std::io::Result<()> {
     let total_start = Instant::now();
     loop {
         print!("\r\x1B[2J\x1B[1;1H");
-
 
         countdown += 1;
 
