@@ -1,6 +1,7 @@
 use gtk::prelude::*;
-use gtk::{Application, ApplicationWindow, Button};
+use gtk::{Application, ApplicationWindow, DrawingArea};
 use gtk4 as gtk;
+use std::f64::consts::PI;
 
 use std::{
     fs::{self, File},
@@ -433,6 +434,59 @@ fn help() {
     );
 }
 
+fn plot_maker() {
+    let input: Vec<f64> = vec![45.0, 399.0, 100.0, 50.0]; 
+
+    let app = Application::builder()
+        .application_id("com.example.twatch")
+        .build();
+
+    app.connect_activate(move |app| {
+        let draw = DrawingArea::new();
+        draw.set_content_height(400);
+        draw.set_content_width(800);
+
+        let data = input.clone();
+
+        draw.set_draw_func(move |_area, context, width, height| {
+            context.set_source_rgb(0.9, 0.9, 0.9);
+            context.paint().expect("Failed to generate background");
+
+            context.set_source_rgb(0.0, 0.0, 0.0);
+            context.set_line_width(2.0);
+
+            let y_base = height as f64 - 20.0;
+
+            context.move_to(0.0, y_base);
+            context.line_to(width as f64, y_base);
+            
+            context.stroke().expect("Failed to draw x line"); 
+
+            context.set_source_rgb(1.0, 0.0, 0.0); 
+
+            let step_x = width as f64 / (data.len() as f64);
+
+            for (i, &temp) in data.iter().enumerate() {
+                let x_pos = i as f64 * step_x;
+                
+                let y_pos = y_base - (temp * 1.0); 
+                
+                context.arc(x_pos, y_pos, 5.0, 0.0, 2.0 * PI); 
+                context.fill().expect("Failed to draw point");
+            }
+        });
+
+        let window = ApplicationWindow::builder()
+            .application(app)
+            .title("Twatch - Scatter (Plot)")
+            .child(&draw)
+            .build();
+
+        window.present();
+    });
+
+    app.run_with_args(&Vec::<String>::new());
+}
 fn on_activate(application: &Application) {
     let window = ApplicationWindow::builder()
         .application(application)
@@ -442,13 +496,4 @@ fn on_activate(application: &Application) {
         .build();
 
     window.present();
-}
-
-fn plot_maker() {
-    let app = Application::builder()
-        .application_id("twatch_graph")
-        .build();
-
-    app.connect_activate(on_activate);
-    app.run_with_args(&Vec::<String>::new());
 }
