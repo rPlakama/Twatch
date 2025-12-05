@@ -1,9 +1,9 @@
 use gtk::prelude::*;
-use gtk::{glib, Application, ApplicationWindow};
+use gtk::{Align, Application, ApplicationWindow, DrawingArea};
+use gtk4::subclass::drawing_area;
 use gtk4::{self as gtk, AspectFrame, Frame};
 
 use std::{
-    error::Error,
     fs::{self, File},
     io::{self, Write},
     path::Path,
@@ -39,6 +39,10 @@ pub struct SessionType {
     pub is_power: bool,
     pub is_temperature: bool,
     pub is_generic: bool,
+}
+
+pub struct GtkToolings {
+    pub css: String,
 }
 
 fn record_frame(
@@ -192,9 +196,9 @@ fn main() {
                 plot_maker();
                 session_type.is_generic = true;
             }
-            "-dd" => {
-                //Gneric Debugger
-                css_loader();
+            "--generic" => {
+                data_treatment();
+                session_type.is_generic = true;
             }
             _ => {
                 println!("Argument invalid or not found {}", arg)
@@ -439,21 +443,37 @@ fn help() {
 }
 
 fn plot_maker() {
-    let app = Application::builder().application_id("twatch").build();
+    let app = Application::builder()
+        .application_id("com.github.twatch")
+        .build();
 
     app.connect_activate(build_ui);
     app.run_with_args(&Vec::<String>::new());
 }
 
 fn build_ui(app: &Application) {
-    let content = Frame::new(Some("My Content"));
+    let content = Frame::new(Some("Graph"));
 
+    let drawing_area = DrawingArea::new();
+    drawing_area.set_draw_func(|_area, context, width, height| {
+        context.set_source_rgb(1.0, 1.0, 1.0);
+        context.paint().expect("Failed to paint");
+
+        context.set_source_rgb(0.0, 0.0, 1.0);
+        context.fill().expect("Failed to fill");
+    });
+
+    content.set_child(Some(&drawing_area));
     let square_container = AspectFrame::builder()
-        .ratio(1.0)
-        .obey_child(true)
-        .margin_top(0)
+        .ratio(2.0)
+        .obey_child(false)
+        .margin_top(30)
         .margin_bottom(0)
         .margin_start(20)
+        .vexpand(true)
+        .hexpand(true)
+        .valign(Align::Fill)
+        .halign(Align::Fill)
         .margin_end(20)
         .child(&content)
         .build();
@@ -461,16 +481,34 @@ fn build_ui(app: &Application) {
     let window = ApplicationWindow::builder()
         .application(app)
         .title("Twatch Plot")
-        .default_width(600)
+        .default_width(1000)
         .default_height(400)
-        .child(&square_container) // Add the square to the window
+        .child(&square_container)
         .build();
 
     window.present();
 }
 
-fn css_loader() -> Result<(), Box<dyn Error>> {
-    let file = fs::read_to_string("./style.css")?;
-    println!("File contents\n{}", file);
-    Ok(())
+//   fn css_loader() -> GtkToolings {
+//       GtkToolings {
+//           css: include_str!("./style.css").to_string(),
+//       }
+//   }
+//
+fn data_treatment() {
+    // Now to read the directory
+    let dir = fs::read_dir("./session").expect(
+        "Unable to read path \n\x1b[1;31m
+        >>Does the ./session exists in current working directory?<< \x1b[0m\n",
+    );
+    // Parsing it as an array
+    let paths: Vec<_> = dir.map(|res| res.expect("Unable to read entry")).collect();
+
+    // Saving the contents of the file
+    let _raw = fs::read_to_string(paths[1].path()).expect("Unable to read latest session");
+
+    println!(
+        "There are these sesssions in session directory: {}",
+        paths.len()
+    );
 }
