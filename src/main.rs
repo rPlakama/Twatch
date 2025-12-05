@@ -1,9 +1,9 @@
 use gtk::prelude::*;
-use gtk::{Application, ApplicationWindow, DrawingArea};
-use gtk4 as gtk;
-use std::f64::consts::PI;
+use gtk::{glib, Application, ApplicationWindow};
+use gtk4::{self as gtk, AspectFrame, Frame};
 
 use std::{
+    error::Error,
     fs::{self, File},
     io::{self, Write},
     path::Path,
@@ -191,6 +191,10 @@ fn main() {
             "-wl" | "--window-test" => {
                 plot_maker();
                 session_type.is_generic = true;
+            }
+            "-dd" => {
+                //Gneric Debugger
+                css_loader();
             }
             _ => {
                 println!("Argument invalid or not found {}", arg)
@@ -437,15 +441,36 @@ fn help() {
 fn plot_maker() {
     let app = Application::builder().application_id("twatch").build();
 
-    app.connect_activate(|app| {
-        let window = ApplicationWindow::builder()
-            .application(app)
-            .default_width(320)
-            .default_height(200)
-            .title("hello")
-            .build();
-        window.present();
-    });
-
+    app.connect_activate(build_ui);
     app.run_with_args(&Vec::<String>::new());
+}
+
+fn build_ui(app: &Application) {
+    let content = Frame::new(Some("My Content"));
+
+    let square_container = AspectFrame::builder()
+        .ratio(1.0)
+        .obey_child(true)
+        .margin_top(0)
+        .margin_bottom(0)
+        .margin_start(20)
+        .margin_end(20)
+        .child(&content)
+        .build();
+
+    let window = ApplicationWindow::builder()
+        .application(app)
+        .title("Twatch Plot")
+        .default_width(600)
+        .default_height(400)
+        .child(&square_container) // Add the square to the window
+        .build();
+
+    window.present();
+}
+
+fn css_loader() -> Result<(), Box<dyn Error>> {
+    let file = fs::read_to_string("./style.css")?;
+    println!("File contents\n{}", file);
+    Ok(())
 }
