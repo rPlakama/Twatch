@@ -56,7 +56,7 @@ pub fn plot_maker() {
     let plot_data = parse_session_data(&csv_content);
 
     let app = Application::builder()
-        .application_id("com.github.twatch")
+        .application_id("com.plot.twatch")
         .build();
 
     app.connect_activate(move |app| build_ui(app, plot_data.clone()));
@@ -64,7 +64,8 @@ pub fn plot_maker() {
 }
 
 pub fn build_ui(app: &Application, plot_data: PlotData) {
-    let content = Frame::new(Some("Temperature Monitor Graph"));
+    // Window Title
+    let content = Frame::new(Some("Current Session ID "));
     let drawing_area = DrawingArea::new();
 
     drawing_area.set_draw_func(move |_area, context, width, height| {
@@ -98,8 +99,8 @@ pub fn build_ui(app: &Application, plot_data: PlotData) {
         context.set_line_width(0.5);
         context.set_source_rgb(0.8, 0.8, 0.8);
 
-        for i in 0..=11 {
-            let temp = i * 10;
+        for i in 0..=22 {
+            let temp = i * 5;
             let y = h - margin_bottom - (temp as f64 / 110.0) * plot_height;
 
             context.move_to(margin_left, y);
