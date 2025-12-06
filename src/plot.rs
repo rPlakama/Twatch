@@ -145,12 +145,12 @@ pub fn build_ui(app: &Application, plot_data: PlotData) {
 
         // Plot lines
         let colors = vec![
-            (1.0, 0.0, 0.0), // Red
-            (0.0, 0.8, 0.0), // Green
-            (0.0, 0.0, 1.0), // Blue
-            (1.0, 1.0, 0.0), // Yellow
-            (1.0, 0.0, 1.0), // Magenta
-            (0.0, 1.0, 1.0), // Cyan
+            (1.0, 0.5, 0.5),
+            (0.2, 0.8, 0.2),
+            (0.5, 0.5, 1.0),
+            (1.0, 1.0, 0.2),
+            (1.0, 0.5, 1.0),
+            (0.5, 1.0, 1.0),
         ];
         let mut color_iter = colors.iter().cycle();
 
