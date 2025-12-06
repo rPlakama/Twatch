@@ -3,8 +3,6 @@ use crate::{
     session::{by_capture_limit, trigger_by_temperature},
 };
 use std::{
-    fs,
-    io::{self},
     process,
 };
 
@@ -21,7 +19,6 @@ pub struct ArgumentPassers {
 }
 
 pub struct SessionType {
-    pub is_power: bool,
     pub is_temperature: bool,
     pub is_generic: bool,
 }
@@ -47,18 +44,6 @@ pub fn args_processor(session_type: &SessionType, passers: &ArgumentPassers) {
     if session_type.is_temperature && passers.is_by_capture && !passers.is_by_temperature {
         by_capture_limit(passers).expect("Unable to start session")
     }
-}
-fn power_usage() -> std::io::Result<()> {
-    let power_input = fs::read_to_string("/sys/class/power_supply/BAT0/power_now")
-        .map_err(|e| io::Error::new(io::ErrorKind::NotFound, format!("BAT0 not found: {}", e)))?;
-    let power_int: f32 = power_input.trim().parse().map_err(|e| {
-        io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!("Failed to parse power: {}", e),
-        )
-    })?;
-    println!("Current watts: {:.2}W", power_int / 1_000_000.0);
-    Ok(())
 }
 
 pub fn help() {

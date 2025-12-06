@@ -13,7 +13,6 @@ fn main() {
     let mut args = std::env::args().skip(1);
 
     let mut session_type = SessionType {
-        is_power: false,
         is_temperature: false,
         is_generic: false,
     };
@@ -41,10 +40,6 @@ fn main() {
     while let Some(arg) = args.next() {
         match &arg[..] {
             "-bt" | "--by-temperature" => {
-                if session_type.is_power {
-                    println!("Don't run more than one type of session at same time");
-                    std::process::exit(1);
-                }
                 session_type.is_temperature = true;
                 arg_passers.is_by_temperature = true;
             }
@@ -79,14 +74,8 @@ fn main() {
                 println!("CPU TEMP: {}C", cpu_temp);
             }
             "-bl" | "--by-capture-limit" => {
+                session_type.is_temperature = true;
                 arg_passers.is_by_capture = true;
-            }
-            "-bw" | "--by-watts" => {
-                if session_type.is_temperature {
-                    println!("Don't run more than one type of session at same time");
-                    std::process::exit(1);
-                }
-                session_type.is_power = true;
             }
             "-ss" | "--see-session" => {
                 arg_passers.see_sessions = true;
