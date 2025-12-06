@@ -1,6 +1,5 @@
 use gtk::prelude::*;
 use gtk::{Align, Application, ApplicationWindow, DrawingArea};
-use gtk4::subclass::drawing_area;
 use gtk4::{self as gtk, AspectFrame, Frame};
 
 use std::{
@@ -9,13 +8,13 @@ use std::{
     path::Path,
     time::Instant,
 };
-
 pub struct SessionFile {
     pub id: u32,
     pub file: File,
     pub buffer: Vec<String>,
     pub flush_interval: usize,
 }
+
 pub struct SensorLabel {
     pub label: String,
     pub is_cpu: bool,
@@ -41,8 +40,12 @@ pub struct SessionType {
     pub is_generic: bool,
 }
 
-pub struct GtkToolings {
-    pub css: String,
+#[derive(Clone)]
+struct PlotData {
+    cpu_temps: Vec<f64>,
+    gpu_temps: Vec<f64>,
+    nvme_temps: Vec<f64>,
+    max_temp: f64,
 }
 
 fn record_frame(
@@ -53,7 +56,7 @@ fn record_frame(
     let sensors = search_sensors()?;
     let mut display_tui: String = Default::default();
 
-    display_tui.push_str(&format!("{}", header_msg));
+    display_tui.push_str(header_msg);
 
     for sensor in &sensors {
         let d_type = device_type(sensor);
@@ -61,9 +64,8 @@ fn record_frame(
         if d_type == "Unknown" {
             continue;
         }
-        // Can be implemented a posix flag
 
-        println!("");
+        println!();
         display_tui.push_str(&format!(
             "\n [{}] {}: {}°C",
             d_type, sensor.label, sensor.temp
@@ -73,7 +75,6 @@ fn record_frame(
             .buffer
             .push(format!("{},{},{}", d_type, sensor.label, sensor.temp));
     }
-
     if session.buffer.len() >= session.flush_interval {
         for line in &session.buffer {
             writeln!(session.file, "{}", line)?;
@@ -123,6 +124,7 @@ fn args_processor(session_type: &SessionType, passers: &ArgumentPassers) {
         println!("Unable to find session file, do a capture first.");
     }
 }
+
 fn main() {
     let mut args = std::env::args().skip(1);
 
@@ -150,6 +152,7 @@ fn main() {
         .find(|s| s.is_cpu)
         .map(|s| s.temp)
         .expect("Unable to read cpu temperature");
+
     while let Some(arg) = args.next() {
         match &arg[..] {
             "-bt" | "--by-temperature" => {
@@ -196,32 +199,12 @@ fn main() {
                 plot_maker();
                 session_type.is_generic = true;
             }
-            "--generic" => {
-                data_treatment();
-                session_type.is_generic = true;
-            }
             _ => {
-                println!("Argument invalid or not found {}", arg)
+                println!("Argument invalid or not found: {}", arg)
             }
         }
-
-        // if !session_type.is_power
-        //     && !session_type.is_generic
-        //     && !arg_passers.plot_latest
-        //     && !arg_passers.is_by_temperature
-        //     && !arg_passers.is_by_capture
-        //     && !help_called
-        // {
-        //     eprintln!(
-        //         "You must provide one of the key arguments: \n
-        //         --plot_latest\n
-        //         --by-watts \n
-        //         --by-capture-limit\n
-        //         --by-temperature\n"
-        //     );
-        //     std::process::exit(1);
-        // }
     }
+
     let _ = session_selector(&mut arg_passers);
     args_processor(&session_type, &arg_passers);
 }
@@ -265,9 +248,9 @@ fn search_sensors() -> std::io::Result<Vec<SensorLabel>> {
                         .to_string();
                     collected_data.push(SensorLabel {
                         label: label_string,
-                        is_cpu: is_cpu,
-                        is_nvme: is_nvme,
-                        is_amd_gpu: is_amd_gpu,
+                        is_cpu,
+                        is_nvme,
+                        is_amd_gpu,
                         temp: temp_value,
                     });
                 }
@@ -277,6 +260,7 @@ fn search_sensors() -> std::io::Result<Vec<SensorLabel>> {
 
     Ok(collected_data)
 }
+
 fn session_writter(passers: &ArgumentPassers) -> std::io::Result<SessionFile> {
     let mut session_id = 0;
 
@@ -293,7 +277,7 @@ fn session_writter(passers: &ArgumentPassers) -> std::io::Result<SessionFile> {
 
             return Ok(SessionFile {
                 id: session_id,
-                file: file,
+                file,
                 buffer: Vec::with_capacity(50),
                 flush_interval: 50,
             });
@@ -334,7 +318,7 @@ fn trigger_by_temperature(passers: &ArgumentPassers) -> std::io::Result<()> {
                 cpu_temp, passers.initial_temperature
             );
         } else {
-            println!("Bellow Target");
+            println!("Below Target");
         }
 
         if cpu_temp > passers.end_temperature {
@@ -352,6 +336,7 @@ fn trigger_by_temperature(passers: &ArgumentPassers) -> std::io::Result<()> {
     }
     Ok(())
 }
+
 fn session_selector(arg_passers: &mut ArgumentPassers) -> io::Result<()> {
     let entries = fs::read_dir(".")?
         .filter_map(|res| res.ok())
@@ -412,6 +397,7 @@ fn by_capture_limit(passers: &ArgumentPassers) -> std::io::Result<()> {
     }
     Ok(())
 }
+
 fn power_usage() -> std::io::Result<()> {
     let power_input = fs::read_to_string("/sys/class/power_supply/BAT0/power_now")
         .map_err(|e| io::Error::new(io::ErrorKind::NotFound, format!("BAT0 not found: {}", e)))?;
@@ -424,6 +410,7 @@ fn power_usage() -> std::io::Result<()> {
     println!("Current watts: {:.2}W", power_int / 1_000_000.0);
     Ok(())
 }
+
 fn help() {
     println!(
         "\n
@@ -442,33 +429,258 @@ fn help() {
     );
 }
 
+fn parse_session_data(csv_content: &str) -> PlotData {
+    let mut cpu_temps = Vec::new();
+    let mut gpu_temps = Vec::new();
+    let mut nvme_temps = Vec::new();
+    let mut max_temp = 0.0f64;
+
+    // We will store the "chosen" label for each device type here.
+    // Once we pick a label (like "Composite"), we ignore all others (like "Sensor 1").
+    let mut cpu_label: Option<String> = None;
+    let mut gpu_label: Option<String> = None;
+    let mut nvme_label: Option<String> = None;
+
+    for line in csv_content.lines() {
+        if line.starts_with('#') || line.starts_with("Type,") {
+            continue;
+        }
+
+        let parts: Vec<&str> = line.split(',').collect();
+        if parts.len() >= 3 {
+            let type_ = parts[0];
+            let label = parts[1];
+
+            // Only proceed if we can parse the temperature
+            if let Ok(temp) = parts[2].parse::<f64>() {
+                max_temp = max_temp.max(temp);
+
+                match type_ {
+                    "CPU" => {
+                        if cpu_label.is_none() {
+                            cpu_label = Some(label.to_string());
+                        }
+                        if cpu_label.as_deref() == Some(label) {
+                            cpu_temps.push(temp);
+                        }
+                    }
+                    "GPU" => {
+                        if gpu_label.is_none() {
+                            gpu_label = Some(label.to_string());
+                        }
+                        if gpu_label.as_deref() == Some(label) {
+                            gpu_temps.push(temp);
+                        }
+                    }
+                    "NVME" => {
+                        if nvme_label.is_none() {
+                            nvme_label = Some(label.to_string());
+                        }
+                        if nvme_label.as_deref() == Some(label) {
+                            nvme_temps.push(temp);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    PlotData {
+        cpu_temps,
+        gpu_temps,
+        nvme_temps,
+        max_temp,
+    }
+}
+
 fn plot_maker() {
+    let dir = fs::read_dir("./session").expect("Unable to read session directory");
+    let mut paths: Vec<_> = dir
+        .filter_map(|res| res.ok())
+        .map(|e| e.path())
+        .filter(|p| p.extension().map_or(false, |ext| ext == "csv"))
+        .collect();
+
+    paths.sort();
+
+    let latest = paths.last().expect("No session files found");
+    let csv_content = fs::read_to_string(latest).expect("Unable to read latest session");
+    let plot_data = parse_session_data(&csv_content);
+
     let app = Application::builder()
         .application_id("com.github.twatch")
         .build();
 
-    app.connect_activate(build_ui);
+    app.connect_activate(move |app| build_ui(app, plot_data.clone()));
     app.run_with_args(&Vec::<String>::new());
 }
 
-fn build_ui(app: &Application) {
-    let content = Frame::new(Some("Graph"));
-
+fn build_ui(app: &Application, plot_data: PlotData) {
+    let content = Frame::new(Some("Temperature Monitor Graph"));
     let drawing_area = DrawingArea::new();
-    drawing_area.set_draw_func(|_area, context, width, height| {
+
+    drawing_area.set_draw_func(move |_area, context, width, height| {
+        let w = width as f64;
+        let h = height as f64;
+
+        // Background
         context.set_source_rgb(1.0, 1.0, 1.0);
         context.paint().expect("Failed to paint");
 
-        context.set_source_rgb(0.0, 0.0, 1.0);
+        let margin_left = 60.0;
+        let margin_right = 40.0;
+        let margin_top = 40.0;
+        let margin_bottom = 50.0;
+
+        let plot_width = w - margin_left - margin_right;
+        let plot_height = h - margin_top - margin_bottom;
+
+        let x_inner_pad = 30.0;
+        let effect_width = plot_width - (x_inner_pad * 2.0);
+
+        // Draw axes
+        context.set_source_rgb(0.0, 0.0, 0.0);
+        context.set_line_width(2.0);
+        context.move_to(margin_left, margin_top);
+        context.line_to(margin_left, h - margin_bottom);
+        context.line_to(w - margin_right, h - margin_bottom);
+        context.stroke().expect("Failed to stroke axes");
+
+        // Grid lines
+        context.set_line_width(0.5);
+        context.set_source_rgb(0.8, 0.8, 0.8);
+
+        for i in 0..=11 {
+            let temp = i * 10;
+            let y = h - margin_bottom - (temp as f64 / 110.0) * plot_height;
+
+            context.move_to(margin_left, y);
+            context.line_to(w - margin_right, y);
+            context.stroke().expect("Failed to stroke grid");
+
+            context.set_source_rgb(0.0, 0.0, 0.0);
+            context.move_to(margin_left - 35.0, y + 5.0);
+            context
+                .show_text(&format!("{}°C", temp))
+                .expect("Failed to show text");
+            context.set_source_rgb(0.8, 0.8, 0.8);
+        }
+
+        let num_samples = plot_data
+            .cpu_temps
+            .len()
+            .max(plot_data.gpu_temps.len())
+            .max(plot_data.nvme_temps.len())
+            .max(1);
+        let sample_step = if num_samples > 10 {
+            num_samples / 10
+        } else {
+            1
+        };
+
+        for i in (0..=num_samples).step_by(sample_step) {
+            let pct = i as f64 / num_samples as f64;
+            let x = margin_left + x_inner_pad + (pct * effect_width);
+
+            context.move_to(x, margin_top);
+            context.line_to(x, h - margin_bottom);
+            context.stroke().expect("Failed to stroke grid");
+
+            context.set_source_rgb(0.0, 0.0, 0.0);
+            context.move_to(x - 10.0, h - margin_bottom + 20.0);
+            context
+                .show_text(&format!("{}", i))
+                .expect("Failed to show text");
+            context.set_source_rgb(0.8, 0.8, 0.8);
+        }
+
+        // Plot lines
+
+        if !plot_data.cpu_temps.is_empty() {
+            context.set_source_rgb(1.0, 0.0, 0.0);
+            context.set_line_width(2.0);
+            for (i, &temp) in plot_data.cpu_temps.iter().enumerate() {
+                let pct = i as f64 / num_samples as f64;
+                let x = margin_left + x_inner_pad + (pct * effect_width);
+
+                let y = h - margin_bottom - (temp / 110.0) * plot_height;
+
+                if i == 0 {
+                    context.move_to(x, y);
+                } else {
+                    context.line_to(x, y);
+                }
+            }
+            context.stroke().expect("Failed to stroke CPU line");
+        }
+        if !plot_data.gpu_temps.is_empty() {
+            context.set_source_rgb(0.0, 0.8, 0.0);
+            context.set_line_width(2.0);
+            for (i, &temp) in plot_data.gpu_temps.iter().enumerate() {
+                let pct = i as f64 / num_samples as f64;
+                let x = margin_left + x_inner_pad + (pct * effect_width);
+
+                let y = h - margin_bottom - (temp / 110.0) * plot_height;
+
+                if i == 0 {
+                    context.move_to(x, y);
+                } else {
+                    context.line_to(x, y);
+                }
+            }
+            context.stroke().expect("Failed to stroke GPU line");
+        }
+
+        if !plot_data.nvme_temps.is_empty() {
+            context.set_source_rgb(0.0, 0.0, 1.0);
+            context.set_line_width(2.0);
+            for (i, &temp) in plot_data.nvme_temps.iter().enumerate() {
+                let pct = i as f64 / num_samples as f64;
+                let x = margin_left + x_inner_pad + (pct * effect_width);
+
+                let y = h - margin_bottom - (temp / 110.0) * plot_height;
+                if i == 0 {
+                    context.move_to(x, y);
+                } else {
+                    context.line_to(x, y);
+                }
+            }
+            context.stroke().expect("Failed to stroke NVME line");
+        }
+
+        // Legend
+        let legend_x = w - margin_right - 120.0;
+        let legend_y = margin_top + 20.0;
+
+        context.set_source_rgb(1.0, 0.0, 0.0);
+        context.rectangle(legend_x, legend_y, 20.0, 10.0);
         context.fill().expect("Failed to fill");
+        context.set_source_rgb(0.0, 0.0, 0.0);
+        context.move_to(legend_x + 25.0, legend_y + 10.0);
+        context.show_text("CPU").expect("Failed to show text");
+
+        context.set_source_rgb(0.0, 0.8, 0.0);
+        context.rectangle(legend_x, legend_y + 20.0, 20.0, 10.0);
+        context.fill().expect("Failed to fill");
+        context.set_source_rgb(0.0, 0.0, 0.0);
+        context.move_to(legend_x + 25.0, legend_y + 30.0);
+        context.show_text("GPU").expect("Failed to show text");
+
+        context.set_source_rgb(0.0, 0.0, 1.0);
+        context.rectangle(legend_x, legend_y + 40.0, 20.0, 10.0);
+        context.fill().expect("Failed to fill");
+        context.set_source_rgb(0.0, 0.0, 0.0);
+        context.move_to(legend_x + 25.0, legend_y + 50.0);
+        context.show_text("NVME").expect("Failed to show text");
     });
 
     content.set_child(Some(&drawing_area));
     let square_container = AspectFrame::builder()
-        .ratio(2.0)
+        .ratio(2.5)
         .obey_child(false)
         .margin_top(30)
-        .margin_bottom(0)
+        .margin_bottom(20)
         .margin_start(20)
         .vexpand(true)
         .hexpand(true)
@@ -480,35 +692,11 @@ fn build_ui(app: &Application) {
 
     let window = ApplicationWindow::builder()
         .application(app)
-        .title("Twatch Plot")
+        .title("Twatch Temperature Plot")
         .default_width(1000)
         .default_height(400)
         .child(&square_container)
         .build();
 
     window.present();
-}
-
-//   fn css_loader() -> GtkToolings {
-//       GtkToolings {
-//           css: include_str!("./style.css").to_string(),
-//       }
-//   }
-//
-fn data_treatment() {
-    // Now to read the directory
-    let dir = fs::read_dir("./session").expect(
-        "Unable to read path \n\x1b[1;31m
-        >>Does the ./session exists in current working directory?<< \x1b[0m\n",
-    );
-    // Parsing it as an array
-    let paths: Vec<_> = dir.map(|res| res.expect("Unable to read entry")).collect();
-
-    // Saving the contents of the file
-    let _raw = fs::read_to_string(paths[1].path()).expect("Unable to read latest session");
-
-    println!(
-        "There are these sesssions in session directory: {}",
-        paths.len()
-    );
 }
