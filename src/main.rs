@@ -5,6 +5,7 @@ pub mod session;
 
 use crate::{
     cli::{args_processor, ArgumentPassers, SessionType},
+    plot::ScalingPlot,
     sensors::search_sensors,
     session::session_selector,
 };
@@ -16,6 +17,12 @@ fn main() {
         is_temperature: false,
         is_generic: false,
     };
+
+    let mut scaling_plot = ScalingPlot {
+        max_plot_temperature: 110,
+        number_of_steps_for_graph: 5,
+    };
+
     let mut arg_passers = ArgumentPassers {
         is_by_temperature: false,
         is_by_capture: false,
@@ -42,6 +49,20 @@ fn main() {
             "-bt" | "--by-temperature" => {
                 session_type.is_temperature = true;
                 arg_passers.is_by_temperature = true;
+            }
+            "--ts" | "--temperature-steps" => {
+                if let Some(val_str) = args.next() {
+                    scaling_plot.number_of_steps_for_graph = val_str
+                        .parse()
+                        .expect("Unable to use this value as an step for graph")
+                }
+            }
+            "-mtg" | "--max-temperature-on-graph" => {
+                if let Some(val_str) = args.next() {
+                    scaling_plot.max_plot_temperature = val_str
+                        .parse()
+                        .expect("Unable to use this value as max on graph")
+                }
             }
             "-h" | "--help" => {
                 _help_called = true;

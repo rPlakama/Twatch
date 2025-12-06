@@ -1,6 +1,6 @@
 use crate::{
     cli::ArgumentPassers,
-    plot::plot_maker,
+    plot::{plot_maker, ScalingPlot},
     sensors::{device_type, search_sensors, SensorLabel},
 };
 use std::{
@@ -126,7 +126,10 @@ pub fn trigger_by_temperature(passers: &ArgumentPassers) -> std::io::Result<()> 
                 total_start.elapsed().as_secs()
             )?;
             writeln!(session.file, "CPU,Exit,{}", cpu_temp)?;
-            plot_maker();
+            plot_maker(ScalingPlot {
+                max_plot_temperature: 110,
+                number_of_steps_for_graph: 5,
+            });
             break;
         }
         std::thread::sleep(std::time::Duration::from_millis(passers.ms_delay));
@@ -191,7 +194,10 @@ pub fn by_capture_limit(passers: &ArgumentPassers) -> std::io::Result<()> {
                 total_start.elapsed().as_secs()
             )?;
             writeln!(session.file, "CPU,Exit,{}", cpu_temp)?;
-            plot_maker();
+            plot_maker(ScalingPlot {
+                max_plot_temperature: 110,
+                number_of_steps_for_graph: 5,
+            });
             break;
         }
         std::thread::sleep(std::time::Duration::from_millis(passers.ms_delay));

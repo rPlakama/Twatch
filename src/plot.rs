@@ -15,6 +15,12 @@ pub struct PlotData {
     series: HashMap<String, SensorData>,
 }
 
+#[derive(Clone, Copy)]
+pub struct ScalingPlot {
+    pub max_plot_temperature: u16,
+    pub number_of_steps_for_graph: u16,
+}
+
 pub fn parse_session_data(csv_content: &str) -> PlotData {
     let mut series = HashMap::new();
 
@@ -41,7 +47,7 @@ pub fn parse_session_data(csv_content: &str) -> PlotData {
     PlotData { series }
 }
 
-pub fn plot_maker() {
+pub fn plot_maker(scale: ScalingPlot) {
     let dir = fs::read_dir("./session").expect("Unable to read session directory");
     let mut paths: Vec<_> = dir
         .filter_map(|res| res.ok())
@@ -59,11 +65,11 @@ pub fn plot_maker() {
         .application_id("com.plot.twatch")
         .build();
 
-    app.connect_activate(move |app| build_ui(app, plot_data.clone()));
+    app.connect_activate(move |app| build_ui(scale, app, plot_data.clone()));
     app.run_with_args(&Vec::<String>::new());
 }
 
-pub fn build_ui(app: &Application, plot_data: PlotData) {
+pub fn build_ui(scale: ScalingPlot, app: &Application, plot_data: PlotData) {
     // Window Title
     let content = Frame::new(Some("Current Session ID "));
     let drawing_area = DrawingArea::new();
@@ -99,9 +105,16 @@ pub fn build_ui(app: &Application, plot_data: PlotData) {
         context.set_line_width(0.5);
         context.set_source_rgb(0.8, 0.8, 0.8);
 
-        for i in 0..=22 {
-            let temp = i * 5;
-            let y = h - margin_bottom - (temp as f64 / 110.0) * plot_height;
+        let step_val = f64::from(scale.number_of_steps_for_graph);
+        let max_temp = f64::from(scale.max_plot_temperature);
+        let num_lines = (max_temp / step_val).floor() as usize;
+
+        for i in 0..=num_lines {
+            // Temperature spacing
+            let temp = (i as f64) * step_val;
+
+            // Total range (Using dynamic max_temp instead of 110.0)
+            let y = h - margin_bottom - (temp / max_temp) * plot_height;
 
             context.move_to(margin_left, y);
             context.line_to(w - margin_right, y);
@@ -163,7 +176,9 @@ pub fn build_ui(app: &Application, plot_data: PlotData) {
                 for (i, &temp) in data.temps.iter().enumerate() {
                     let pct = i as f64 / num_samples as f64;
                     let x = margin_left + x_inner_pad + (pct * effect_width);
-                    let y = h - margin_bottom - (temp / 110.0) * plot_height;
+
+                    // FIX 5: Use dynamic max_temp here too
+                    let y = h - margin_bottom - (temp / max_temp) * plot_height;
 
                     if i == 0 {
                         context.move_to(x, y);

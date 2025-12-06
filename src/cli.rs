@@ -1,10 +1,8 @@
 use crate::{
-    plot::plot_maker,
+    plot::{plot_maker, ScalingPlot},
     session::{by_capture_limit, trigger_by_temperature},
 };
-use std::{
-    process,
-};
+use std::process;
 
 pub struct ArgumentPassers {
     pub is_by_temperature: bool,
@@ -26,7 +24,10 @@ pub struct SessionType {
 pub fn args_processor(session_type: &SessionType, passers: &ArgumentPassers) {
     // Singular works
     if passers.plot_latest {
-        plot_maker();
+        plot_maker(ScalingPlot {
+            max_plot_temperature: 110,
+            number_of_steps_for_graph: 5,
+        });
         println!("Work is done, bye");
         process::exit(1);
     }
