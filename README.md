@@ -3,6 +3,28 @@
 - Twatch currently works by capturing HWMON devices using Rust + GTK4.
 
 
+# What it can do right now? 
+
+    Current options are: 
+
+    -bt  | --by-temperature 
+    -bl  | --by-capture-limit 
+    -pl  | --plot-latest 
+    -ss  | --see-session
+
+    -it  | --initial-temperature 
+    -et  | --end-temperature 
+
+    -mtg | --max-temperature-on-graph
+    -ts  | --temperature-steps
+
+
+    -d   | --delay 
+    -c   | --captures 
+
+    -ct  | --current-temperature 
+    -h   | --help
+
 # Graphic Examples:
 
 #![First](./examples/GTK_Capture-stress-ng_4CPU.png)
@@ -10,7 +32,6 @@
 Firstly: 
 
 - Making session selector (Currently there are the session printer, easy tho)
-- Making file be saved as a buffer (Struct) to be reused as treated by other functions (The treated data, X and Y to be used by the drawing in GTK)
 
 Secondary:
 

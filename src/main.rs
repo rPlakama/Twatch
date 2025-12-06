@@ -50,7 +50,7 @@ fn main() {
                 session_type.is_temperature = true;
                 arg_passers.is_by_temperature = true;
             }
-            "--ts" | "--temperature-steps" => {
+            "-ts" | "--temperature-steps" => {
                 if let Some(val_str) = args.next() {
                     scaling_plot.number_of_steps_for_graph = val_str
                         .parse()

@@ -57,7 +57,7 @@ pub fn help() {
     -et  | --end-temperature 
     -pl  | --plot-latest 
     -mtg | --max-temperature-on-graph
-    --ts | --temperature-steps
+    -ts | --temperature-steps
     -ss  | --see-session
     -d   | --delay 
     -c   | --captures 
