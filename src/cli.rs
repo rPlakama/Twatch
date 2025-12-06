@@ -14,6 +14,8 @@ pub struct ArgumentPassers {
     pub initial_temperature: u32,
     pub end_temperature: u32,
     pub session_exists: bool,
+    pub max_plot_temperature: u16,
+    pub number_of_steps_for_graph: u16,
 }
 
 pub struct SessionType {
@@ -25,8 +27,8 @@ pub fn args_processor(session_type: &SessionType, passers: &ArgumentPassers) {
     // Singular works
     if passers.plot_latest {
         plot_maker(ScalingPlot {
-            max_plot_temperature: 110,
-            number_of_steps_for_graph: 5,
+            max_plot_temperature: passers.max_plot_temperature,
+            number_of_steps_for_graph: passers.number_of_steps_for_graph,
         });
         println!("Work is done, bye");
         process::exit(1);
