@@ -67,19 +67,19 @@ pub fn args_processor(session_type: &SessionType, passers: &ArgumentPassers) {
 pub fn help() {
     println!(
         "
-    Current options are: 
-    -bt  | --by-temperature 
-    -bl  | --by-capture-limit 
-    -it  | --initial-temperature 
-    -et  | --end-temperature 
-    -pl  | --plot-latest 
+    Current options are:
+    -bt  | --by-temperature
+    -bl  | --by-capture-limit
+    -it  | --initial-temperature
+    -et  | --end-temperature
+    -pl  | --plot-latest
     -ps  | --plot-session
     -mtg | --max-temperature-on-graph
-    -ts | --temperature-steps
+    -ts  | --temperature-steps
     -ss  | --see-session
-    -d   | --delay 
-    -c   | --captures 
-    -ct  | --current-temperature 
+    -d   | --delay
+    -c   | --captures
+    -ct  | --current-temperature
     -h   | --help
     "
     );
