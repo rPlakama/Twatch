@@ -42,7 +42,7 @@ pub fn record_frame(
 
         session
             .buffer
-            .push(format!( "{},{},{}", d_type, sensor.label, sensor.temp));
+            .push(format!("{},{},{}", d_type, sensor.label, sensor.temp));
     }
     if session.buffer.len() >= session.flush_interval {
         for line in &session.buffer {
@@ -135,7 +135,7 @@ pub fn trigger_by_temperature(passers: &ArgumentPassers) -> std::io::Result<()> 
 }
 
 pub fn session_selector(arg_passers: &mut ArgumentPassers) -> io::Result<()> {
-    let entries = fs::read_dir(".")? 
+    let entries = fs::read_dir(".")?
         .filter_map(|res| res.ok())
         .map(|e| e.path())
         .collect::<Vec<_>>();

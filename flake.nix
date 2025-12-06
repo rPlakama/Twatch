@@ -25,8 +25,10 @@
         cargoLock.lockFile = ./Cargo.lock;
         nativeBuildInputs = with pkgs; [
           pkg-config
-          gtk4
         ];
+	buildInputs = with pkgs; [
+	  gtk4
+	];
       };
 
       devShells.default = pkgs.mkShell {

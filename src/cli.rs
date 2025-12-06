@@ -62,7 +62,8 @@ pub fn power_usage() -> std::io::Result<()> {
 }
 
 pub fn help() {
-    println!("
+    println!(
+        "
     Current options are: 
     -bt | --by-temperature 
     -bl | --by-capture-limit 
@@ -74,5 +75,6 @@ pub fn help() {
     -ct | --current-temperature 
     -bw | --by-watts 
     -h  | --help 
-    ");
+    "
+    );
 }

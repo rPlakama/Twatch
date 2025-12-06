@@ -1,25 +1,22 @@
 use gtk::prelude::*;
-use gtk::{Align, Application, ApplicationWindow, DrawingArea};
-use gtk4::{self as gtk, AspectFrame, Frame};
+use gtk::{Application, ApplicationWindow, DrawingArea};
+use gtk4::{self as gtk, Frame};
+use std::collections::HashMap;
 use std::fs;
 
 #[derive(Clone)]
+pub struct SensorData {
+    type_: String,
+    temps: Vec<f64>,
+}
+
+#[derive(Clone)]
 pub struct PlotData {
-    cpu_temps: Vec<f64>,
-    gpu_temps: Vec<f64>,
-    nvme_temps: Vec<f64>,
+    series: HashMap<String, SensorData>,
 }
 
 pub fn parse_session_data(csv_content: &str) -> PlotData {
-    let mut cpu_temps = Vec::new();
-    let mut gpu_temps = Vec::new();
-    let mut nvme_temps = Vec::new();
-
-    // We will store the "chosen" label for each device type here.
-    // Once we pick a label (like "Composite"), we ignore all others (like "Sensor 1").
-    let mut cpu_label: Option<String> = None;
-    let mut gpu_label: Option<String> = None;
-    let mut nvme_label: Option<String> = None;
+    let mut series = HashMap::new();
 
     for line in csv_content.lines() {
         if line.starts_with('#') || line.starts_with("Type,") {
@@ -28,48 +25,20 @@ pub fn parse_session_data(csv_content: &str) -> PlotData {
 
         let parts: Vec<&str> = line.split(',').collect();
         if parts.len() >= 3 {
-            let type_ = parts[0];
-            let label = parts[1];
+            let type_ = parts[0].to_string();
+            let label = parts[1].to_string();
 
-            // Only proceed if we can parse the temperature
             if let Ok(temp) = parts[2].parse::<f64>() {
-
-                match type_ {
-                    "CPU" => {
-                        if cpu_label.is_none() {
-                            cpu_label = Some(label.to_string());
-                        }
-                        if cpu_label.as_deref() == Some(label) {
-                            cpu_temps.push(temp);
-                        }
-                    }
-                    "GPU" => {
-                        if gpu_label.is_none() {
-                            gpu_label = Some(label.to_string());
-                        }
-                        if gpu_label.as_deref() == Some(label) {
-                            gpu_temps.push(temp);
-                        }
-                    }
-                    "NVME" => {
-                        if nvme_label.is_none() {
-                            nvme_label = Some(label.to_string());
-                        }
-                        if nvme_label.as_deref() == Some(label) {
-                            nvme_temps.push(temp);
-                        }
-                    }
-                    _ => {}
-                }
+                let entry = series.entry(label).or_insert_with(|| SensorData {
+                    type_,
+                    temps: Vec::new(),
+                });
+                entry.temps.push(temp);
             }
         }
     }
 
-    PlotData {
-        cpu_temps,
-        gpu_temps,
-        nvme_temps,
-    }
+    PlotData { series }
 }
 
 pub fn plot_maker() {
@@ -146,10 +115,11 @@ pub fn build_ui(app: &Application, plot_data: PlotData) {
         }
 
         let num_samples = plot_data
-            .cpu_temps
-            .len()
-            .max(plot_data.gpu_temps.len())
-            .max(plot_data.nvme_temps.len())
+            .series
+            .values()
+            .map(|data| data.temps.len())
+            .max()
+            .unwrap_or(0)
             .max(1);
         let sample_step = if num_samples > 10 {
             num_samples / 10
@@ -174,106 +144,64 @@ pub fn build_ui(app: &Application, plot_data: PlotData) {
         }
 
         // Plot lines
+        let colors = vec![
+            (1.0, 0.0, 0.0), // Red
+            (0.0, 0.8, 0.0), // Green
+            (0.0, 0.0, 1.0), // Blue
+            (1.0, 1.0, 0.0), // Yellow
+            (1.0, 0.0, 1.0), // Magenta
+            (0.0, 1.0, 1.0), // Cyan
+        ];
+        let mut color_iter = colors.iter().cycle();
 
-        if !plot_data.cpu_temps.is_empty() {
-            context.set_source_rgb(1.0, 0.0, 0.0);
-            context.set_line_width(2.0);
-            for (i, &temp) in plot_data.cpu_temps.iter().enumerate() {
-                let pct = i as f64 / num_samples as f64;
-                let x = margin_left + x_inner_pad + (pct * effect_width);
+        for (_label, data) in &plot_data.series {
+            if !data.temps.is_empty() {
+                let (r, g, b) = *color_iter.next().unwrap();
+                context.set_source_rgb(r, g, b);
+                context.set_line_width(2.0);
+                for (i, &temp) in data.temps.iter().enumerate() {
+                    let pct = i as f64 / num_samples as f64;
+                    let x = margin_left + x_inner_pad + (pct * effect_width);
+                    let y = h - margin_bottom - (temp / 110.0) * plot_height;
 
-                let y = h - margin_bottom - (temp / 110.0) * plot_height;
-
-                if i == 0 {
-                    context.move_to(x, y);
-                } else {
-                    context.line_to(x, y);
+                    if i == 0 {
+                        context.move_to(x, y);
+                    } else {
+                        context.line_to(x, y);
+                    }
                 }
+                context.stroke().expect("Failed to stroke line");
             }
-            context.stroke().expect("Failed to stroke CPU line");
-        }
-        if !plot_data.gpu_temps.is_empty() {
-            context.set_source_rgb(0.0, 0.8, 0.0);
-            context.set_line_width(2.0);
-            for (i, &temp) in plot_data.gpu_temps.iter().enumerate() {
-                let pct = i as f64 / num_samples as f64;
-                let x = margin_left + x_inner_pad + (pct * effect_width);
-
-                let y = h - margin_bottom - (temp / 110.0) * plot_height;
-
-                if i == 0 {
-                    context.move_to(x, y);
-                } else {
-                    context.line_to(x, y);
-                }
-            }
-            context.stroke().expect("Failed to stroke GPU line");
-        }
-
-        if !plot_data.nvme_temps.is_empty() {
-            context.set_source_rgb(0.0, 0.0, 1.0);
-            context.set_line_width(2.0);
-            for (i, &temp) in plot_data.nvme_temps.iter().enumerate() {
-                let pct = i as f64 / num_samples as f64;
-                let x = margin_left + x_inner_pad + (pct * effect_width);
-
-                let y = h - margin_bottom - (temp / 110.0) * plot_height;
-                if i == 0 {
-                    context.move_to(x, y);
-                } else {
-                    context.line_to(x, y);
-                }
-            }
-            context.stroke().expect("Failed to stroke NVME line");
         }
 
         // Legend
         let legend_x = w - margin_right - 120.0;
-        let legend_y = margin_top + 20.0;
+        let mut legend_y = margin_top + 20.0;
+        let mut color_iter = colors.iter().cycle();
 
-        context.set_source_rgb(1.0, 0.0, 0.0);
-        context.rectangle(legend_x, legend_y, 20.0, 10.0);
-        context.fill().expect("Failed to fill");
-        context.set_source_rgb(0.0, 0.0, 0.0);
-        context.move_to(legend_x + 25.0, legend_y + 10.0);
-        context.show_text("CPU").expect("Failed to show text");
+        for (label_key, data) in &plot_data.series {
+            let (r, g, b) = *color_iter.next().unwrap();
+            context.set_source_rgb(r, g, b);
+            context.rectangle(legend_x, legend_y, 20.0, 10.0);
+            context.fill().expect("Failed to fill");
 
-        context.set_source_rgb(0.0, 0.8, 0.0);
-        context.rectangle(legend_x, legend_y + 20.0, 20.0, 10.0);
-        context.fill().expect("Failed to fill");
-        context.set_source_rgb(0.0, 0.0, 0.0);
-        context.move_to(legend_x + 25.0, legend_y + 30.0);
-        context.show_text("GPU").expect("Failed to show text");
-
-        context.set_source_rgb(0.0, 0.0, 1.0);
-        context.rectangle(legend_x, legend_y + 40.0, 20.0, 10.0);
-        context.fill().expect("Failed to fill");
-        context.set_source_rgb(0.0, 0.0, 0.0);
-        context.move_to(legend_x + 25.0, legend_y + 50.0);
-        context.show_text("NVME").expect("Failed to show text");
+            context.set_source_rgb(0.0, 0.0, 0.0);
+            context.move_to(legend_x + 25.0, legend_y + 10.0);
+            context
+                .show_text(&format!("{}.{}", data.type_, label_key))
+                .expect("Failed to show text");
+            legend_y += 20.0;
+        }
     });
 
     content.set_child(Some(&drawing_area));
-    let square_container = AspectFrame::builder()
-        .ratio(2.5)
-        .obey_child(false)
-        .margin_top(30)
-        .margin_bottom(20)
-        .margin_start(20)
-        .vexpand(true)
-        .hexpand(true)
-        .valign(Align::Fill)
-        .halign(Align::Fill)
-        .margin_end(20)
-        .child(&content)
-        .build();
 
     let window = ApplicationWindow::builder()
         .application(app)
         .title("Twatch Temperature Plot")
         .default_width(1000)
         .default_height(400)
-        .child(&square_container)
+        .child(&content)
         .build();
 
     window.present();
