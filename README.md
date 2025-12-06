@@ -31,17 +31,16 @@
 
 Firstly:
 
-- Making session selector (Currently there are the session printer, easy tho)
+- Hybrid POSIX flags
+- Making show-hidden-posix (smth in line 70 or whatever)
+- extensive selection for devices
 
 
 Secondary:
 
-- Hybrid POSIX flags
-- Making show-hidden-posix (smth in line 70 or whatever)
-- Creating a selection list for sessions [0%]
+- Optmizations
 - Power usage monitor
 - More detailed graphs
-- extensive selection for devices
 
 # How can I run it?
 
