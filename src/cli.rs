@@ -51,16 +51,18 @@ pub fn help() {
     println!(
         "
     Current options are: 
-    -bt | --by-temperature 
-    -bl | --by-capture-limit 
-    -it | --initial_temperature 
-    -et | --end_temperature 
-    -pl | --plot-latest 
-    -d  | --delay 
-    -c  | --captures 
-    -ct | --current-temperature 
-    -bw | --by-watts 
-    -h  | --help 
+    -bt  | --by-temperature 
+    -bl  | --by-capture-limit 
+    -it  | --initial-temperature 
+    -et  | --end-temperature 
+    -pl  | --plot-latest 
+    -mtg | --max-temperature-on-graph
+    --ts | --temperature-steps
+    -ss  | --see-session
+    -d   | --delay 
+    -c   | --captures 
+    -ct  | --current-temperature 
+    -h   | --help
     "
     );
 }

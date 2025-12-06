@@ -154,7 +154,13 @@ pub fn session_selector(arg_passers: &mut ArgumentPassers) -> io::Result<()> {
     }
 
     if arg_passers.see_sessions && found_session {
-        println!("Conditions meet")
+        let session_files = fs::read_dir("./session")?
+            .filter_map(|res| res.ok())
+            .map(|e| e.path())
+            .filter(|p| p.extension().map_or(false, |ext| ext == "csv"));
+        for path in session_files {
+            println!("{}", path.display());
+        }
     }
 
     Ok(())
