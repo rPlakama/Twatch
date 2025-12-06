@@ -51,7 +51,8 @@ pub fn plot_maker(session_id: Option<u16>, scale: ScalingPlot) {
     let csv_content = match session_id {
         Some(id) => {
             let path = format!("./session/session_{}.csv", id);
-            fs::read_to_string(&path).unwrap_or_else(|_| panic!("Unable to read session file: {}", path))
+            fs::read_to_string(&path)
+                .unwrap_or_else(|_| panic!("Unable to read session file: {}", path))
         }
         None => {
             let dir = fs::read_dir("./session").expect("Unable to read session directory");
