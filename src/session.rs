@@ -150,6 +150,10 @@ pub fn session_selector(arg_passers: &mut ArgumentPassers) -> io::Result<()> {
         println!("Session folder not found in current PATH");
     }
 
+    if arg_passers.see_sessions && found_session {
+        println!("Conditions meet")
+    }
+
     Ok(())
 }
 

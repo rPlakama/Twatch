@@ -21,6 +21,7 @@ fn main() {
         is_by_temperature: false,
         is_by_capture: false,
         ms_delay: 250,
+        see_sessions: false,
         amount_captures: 250,
         plot_latest: false,
         end_temperature: 70,
@@ -40,6 +41,10 @@ fn main() {
     while let Some(arg) = args.next() {
         match &arg[..] {
             "-bt" | "--by-temperature" => {
+                if session_type.is_power {
+                    println!("Don't run more than one type of session at same time");
+                    std::process::exit(1);
+                }
                 session_type.is_temperature = true;
                 arg_passers.is_by_temperature = true;
             }
@@ -77,11 +82,14 @@ fn main() {
                 arg_passers.is_by_capture = true;
             }
             "-bw" | "--by-watts" => {
+                if session_type.is_temperature {
+                    println!("Don't run more than one type of session at same time");
+                    std::process::exit(1);
+                }
                 session_type.is_power = true;
             }
-            "-wl" | "--window-test" => {
-                plot::plot_maker();
-                session_type.is_generic = true;
+            "-ss" | "--see-session" => {
+                arg_passers.see_sessions = true;
             }
             _ => {
                 println!("Argument invalid or not found: {}", arg)

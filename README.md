@@ -12,7 +12,6 @@ Firstly:
 
 - Making session selector (Currently there are the session printer, easy tho)
 - Making file be saved as a buffer (Struct) to be reused as treated by other functions (The treated data, X and Y to be used by the drawing in GTK)
-- Preparing the plot table, containing the X scaled by the amount of captures and y as an fixed value (0 to 110C)
 
 Secondary:
 
