@@ -26,9 +26,9 @@
         nativeBuildInputs = with pkgs; [
           pkg-config
         ];
-	buildInputs = with pkgs; [
-	  gtk4
-	];
+        buildInputs = with pkgs; [
+          gtk4
+        ];
       };
 
       devShells.default = pkgs.mkShell {

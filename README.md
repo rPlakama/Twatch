@@ -1,12 +1,11 @@
 # How does it works? 
 
-- Twatch currently works by capturing HWMON devices using Rust and creates a file, which Python does create an plot.
+- Twatch currently works by capturing HWMON devices using Rust + GTK4.
 
 
 # Graphic Examples:
 
-#![First](./examples/1.png) 
-#![Second](./examples/2.png) 
+#![First](./examples/GTK_Capture-stress-ng_4CPU.png)
 
 Firstly: 
 
@@ -27,10 +26,6 @@ Secondary:
 Currently, the project is based on Nix, which you can have a temporary shell with this command:
 
 ```nix shell github:rPlakama/Twatch``` 
-
-But, since it uses small depedencies (pandas, and matplotlib). You can copy this repo with a mere clone. 
-
-(Since the development flake paramenters, the main.rs won't be able to pull the graph. For testing, you need to execute ```python graph.py``` in your shell.)
 
 # If I want to Colaborate? 
 
