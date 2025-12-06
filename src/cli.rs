@@ -8,9 +8,10 @@ pub struct ArgumentPassers {
     pub is_by_temperature: bool,
     pub is_by_capture: bool,
     pub plot_latest: bool,
+    pub plot_session: Option<u16>,
     pub see_sessions: bool,
     pub ms_delay: u64,
-    pub amount_captures: u64,
+    pub amount_captures: u16,
     pub initial_temperature: u32,
     pub end_temperature: u32,
     pub session_exists: bool,
@@ -25,11 +26,25 @@ pub struct SessionType {
 
 pub fn args_processor(session_type: &SessionType, passers: &ArgumentPassers) {
     // Singular works
+    if let Some(session_id) = passers.plot_session {
+        plot_maker(
+            Some(session_id),
+            ScalingPlot {
+                max_plot_temperature: passers.max_plot_temperature,
+                number_of_steps_for_graph: passers.number_of_steps_for_graph,
+            },
+        );
+        println!("Work is done, bye");
+        process::exit(1);
+    }
     if passers.plot_latest {
-        plot_maker(ScalingPlot {
-            max_plot_temperature: passers.max_plot_temperature,
-            number_of_steps_for_graph: passers.number_of_steps_for_graph,
-        });
+        plot_maker(
+            None,
+            ScalingPlot {
+                max_plot_temperature: passers.max_plot_temperature,
+                number_of_steps_for_graph: passers.number_of_steps_for_graph,
+            },
+        );
         println!("Work is done, bye");
         process::exit(1);
     }
@@ -58,6 +73,7 @@ pub fn help() {
     -it  | --initial-temperature 
     -et  | --end-temperature 
     -pl  | --plot-latest 
+    -ps  | --plot-session
     -mtg | --max-temperature-on-graph
     -ts | --temperature-steps
     -ss  | --see-session

@@ -47,18 +47,26 @@ pub fn parse_session_data(csv_content: &str) -> PlotData {
     PlotData { series }
 }
 
-pub fn plot_maker(scale: ScalingPlot) {
-    let dir = fs::read_dir("./session").expect("Unable to read session directory");
-    let mut paths: Vec<_> = dir
-        .filter_map(|res| res.ok())
-        .map(|e| e.path())
-        .filter(|p| p.extension().map_or(false, |ext| ext == "csv"))
-        .collect();
+pub fn plot_maker(session_id: Option<u16>, scale: ScalingPlot) {
+    let csv_content = match session_id {
+        Some(id) => {
+            let path = format!("./session/session_{}.csv", id);
+            fs::read_to_string(&path).unwrap_or_else(|_| panic!("Unable to read session file: {}", path))
+        }
+        None => {
+            let dir = fs::read_dir("./session").expect("Unable to read session directory");
+            let mut paths: Vec<_> = dir
+                .filter_map(|res| res.ok())
+                .map(|e| e.path())
+                .filter(|p| p.extension().map_or(false, |ext| ext == "csv"))
+                .collect();
 
-    paths.sort();
+            paths.sort();
 
-    let latest = paths.last().expect("No session files found");
-    let csv_content = fs::read_to_string(latest).expect("Unable to read latest session");
+            let latest = paths.last().expect("No session files found");
+            fs::read_to_string(latest).expect("Unable to read latest session")
+        }
+    };
     let plot_data = parse_session_data(&csv_content);
 
     let app = Application::builder()

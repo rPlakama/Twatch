@@ -24,6 +24,7 @@ fn main() {
         see_sessions: false,
         amount_captures: 250,
         plot_latest: false,
+        plot_session: None,
         end_temperature: 70,
         initial_temperature: 40,
         session_exists: false,
@@ -67,6 +68,14 @@ fn main() {
             "-pl" | "--plot-latest" => {
                 arg_passers.plot_latest = true;
             }
+            "-p" | "-ps" | "--plot-session" => {
+                if let Some(val_str) = args.next() {
+                    arg_passers.plot_session =
+                        Some(val_str.parse::<u16>().expect("Unable to parse session ID"));
+                } else {
+                    println!("--plot-session requires a session ID");
+                }
+            }
             "-d" | "--delay" => {
                 if let Some(val_str) = args.next() {
                     arg_passers.ms_delay = val_str.parse().unwrap_or(250);
@@ -74,7 +83,7 @@ fn main() {
             }
             "-c" | "--captures" => {
                 if let Some(val_str) = args.next() {
-                    arg_passers.amount_captures = val_str.parse().unwrap_or(500);
+                    arg_passers.amount_captures = val_str.parse::<u16>().unwrap_or(500);
                 }
             }
             "-it" | "--initial-temperature" => {

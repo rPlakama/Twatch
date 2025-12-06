@@ -11,7 +11,7 @@ use std::{
 };
 
 pub struct SessionFile {
-    pub id: u32,
+    pub id: u16,
     pub file: File,
     pub buffer: Vec<String>,
     pub flush_interval: usize,
@@ -19,7 +19,7 @@ pub struct SessionFile {
 
 pub fn record_frame(
     session: &mut SessionFile,
-    _countdown: u64,
+    _countdown: u16,
     header_msg: &str,
 ) -> std::io::Result<Vec<SensorLabel>> {
     let sensors = search_sensors()?;
@@ -59,7 +59,7 @@ pub fn record_frame(
 }
 
 pub fn session_writter(passers: &ArgumentPassers) -> std::io::Result<SessionFile> {
-    let mut session_id = 0;
+    let mut session_id: u16 = 0;
 
     loop {
         let condidate = format!("session/session_{}.csv", session_id);
@@ -86,7 +86,7 @@ pub fn session_writter(passers: &ArgumentPassers) -> std::io::Result<SessionFile
 pub fn trigger_by_temperature(passers: &ArgumentPassers) -> std::io::Result<()> {
     print!("\r\x1B[2J\x1B[1;1H");
     let mut session = session_writter(passers)?;
-    let mut countdown = 0;
+    let mut countdown: u16 = 0;
 
     let total_start = Instant::now();
     loop {
@@ -100,7 +100,6 @@ pub fn trigger_by_temperature(passers: &ArgumentPassers) -> std::io::Result<()> 
         );
 
         let sensors = record_frame(&mut session, countdown, &status_header)?;
-
         let cpu_temp = sensors
             .iter()
             .find(|s| s.is_cpu)
@@ -126,10 +125,13 @@ pub fn trigger_by_temperature(passers: &ArgumentPassers) -> std::io::Result<()> 
                 total_start.elapsed().as_secs()
             )?;
             writeln!(session.file, "CPU,Exit,{}", cpu_temp)?;
-            plot_maker(ScalingPlot {
-                max_plot_temperature: 110,
-                number_of_steps_for_graph: 5,
-            });
+            plot_maker(
+                None,
+                ScalingPlot {
+                    max_plot_temperature: passers.max_plot_temperature,
+                    number_of_steps_for_graph: passers.number_of_steps_for_graph,
+                },
+            );
             break;
         }
         std::thread::sleep(std::time::Duration::from_millis(passers.ms_delay));
@@ -168,7 +170,7 @@ pub fn session_selector(arg_passers: &mut ArgumentPassers) -> io::Result<()> {
 
 pub fn by_capture_limit(passers: &ArgumentPassers) -> std::io::Result<()> {
     let mut session = session_writter(passers)?;
-    let mut countdown = 0;
+    let mut countdown: u16 = 0;
 
     let total_start = Instant::now();
     loop {
@@ -200,10 +202,13 @@ pub fn by_capture_limit(passers: &ArgumentPassers) -> std::io::Result<()> {
                 total_start.elapsed().as_secs()
             )?;
             writeln!(session.file, "CPU,Exit,{}", cpu_temp)?;
-            plot_maker(ScalingPlot {
-                max_plot_temperature: 110,
-                number_of_steps_for_graph: 5,
-            });
+            plot_maker(
+                None,
+                ScalingPlot {
+                    max_plot_temperature: passers.max_plot_temperature,
+                    number_of_steps_for_graph: passers.number_of_steps_for_graph,
+                },
+            );
             break;
         }
         std::thread::sleep(std::time::Duration::from_millis(passers.ms_delay));
