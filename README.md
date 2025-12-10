@@ -9,19 +9,15 @@
 
     -bt  | --by-temperature
     -bl  | --by-capture-limit
-    -pl  | --plot-latest
-    -ss  | --see-session
-
     -it  | --initial-temperature
     -et  | --end-temperature
-
+    -pl  | --plot-latest
+    -ps  | --plot-session
     -mtg | --max-temperature-on-graph
     -ts  | --temperature-steps
-
-
+    -ss  | --see-session
     -d   | --delay
     -c   | --captures
-
     -ct  | --current-temperature
     -h   | --help
 
