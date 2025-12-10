@@ -28,7 +28,7 @@
 # Graphic Examples:
 
 #![First](./examples/GTK_Capture-stress-ng_4CPU.png)
-#![Sec](./examples/Screenshot from 2025-12-10 20-34-21.png)
+#![Sec](./examples/example2.png)
 
 Firstly:
 
