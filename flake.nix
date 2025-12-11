@@ -1,4 +1,4 @@
-{
+  {
   description = "Twatch package";
 
   inputs = {
@@ -44,7 +44,7 @@
         ];
 
         shellHook = ''
-          rustc --version; rust-analyzer --version; gtk4 --version; gh --version; cargo --version; echo "Loaded!"; fish
+        rust-analyzer --version; gtk4 --version; gh --version; cargo --version; echo "Loaded!"; fish
         '';
       };
     });
