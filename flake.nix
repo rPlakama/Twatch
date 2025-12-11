@@ -39,7 +39,6 @@
         buildInputs = with pkgs; [
           rustfmt
           rust-analyzer
-          rustc
           gtk4
           gh
         ];
