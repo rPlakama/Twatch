@@ -140,19 +140,20 @@ pub fn trigger_by_temperature(passers: &ArgumentPassers) -> std::io::Result<()> 
 }
 
 pub fn session_selector(arg_passers: &mut ArgumentPassers) -> io::Result<()> {
-    let entries = fs::read_dir(".")?
-        .filter_map(|res| res.ok())
-        .map(|e| e.path())
-        .collect::<Vec<_>>();
+    //let entries = fs::read_dir(".")?
+    //    .filter_map(|res| res.ok())
+    //    .map(|e| e.path())
+    //    .collect::<Vec<_>>();
 
-    let found_session = entries
-        .iter()
-        .any(|p| p.file_name() == Some("session".as_ref()) && p.is_dir());
+    //let found_session = entries
+    //    .iter()
+    //    .any(|p| p.file_name() == Some("session".as_ref()) && p.is_dir());
+
+    // Now it shall be returning false or true if 'session' exists inside of Documents/Twatch as
+    // made in plot.rs
 
     if found_session {
         arg_passers.session_exists = found_session;
-    } else {
-        println!("Session folder not found in current PATH");
     }
 
     if arg_passers.see_sessions && found_session {
@@ -164,6 +165,8 @@ pub fn session_selector(arg_passers: &mut ArgumentPassers) -> io::Result<()> {
             println!("{}", path.display());
         }
     }
+
+    // I mean all this logic passer SUCKS
 
     Ok(())
 }

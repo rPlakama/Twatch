@@ -3,6 +3,7 @@ use gtk::{Application, ApplicationWindow, DrawingArea};
 use gtk4::{self as gtk, Frame};
 use std::collections::HashMap;
 use std::fs;
+use std::path::PathBuf;
 
 #[derive(Clone)]
 pub struct SensorData {
@@ -48,14 +49,18 @@ pub fn parse_session_data(csv_content: &str) -> PlotData {
 }
 
 pub fn plot_maker(session_id: Option<u16>, scale: ScalingPlot) {
+    let home = PathBuf::from(std::env::var("HOME").expect("$HOME not set"));
+    let twatch_dir = home.join("Documents").join("Twatch");
+
     let csv_content = match session_id {
         Some(id) => {
-            let path = format!("./session/session_{}.csv", id);
+            let path = twatch_dir.join(format!("session_{}.csv", id));
             fs::read_to_string(&path)
-                .unwrap_or_else(|_| panic!("Unable to read session file: {}", path))
+                .unwrap_or_else(|_| panic!("Unable to read session file: {:?}", path))
         }
         None => {
-            let dir = fs::read_dir("./session").expect("Unable to read session directory");
+            let dir =
+                fs::read_dir(&twatch_dir).expect("Failed to read session folder (ERR plot.rs)");
             let mut paths: Vec<_> = dir
                 .filter_map(|res| res.ok())
                 .map(|e| e.path())
@@ -68,6 +73,7 @@ pub fn plot_maker(session_id: Option<u16>, scale: ScalingPlot) {
             fs::read_to_string(latest).expect("Unable to read latest session")
         }
     };
+
     let plot_data = parse_session_data(&csv_content);
 
     let app = Application::builder()
@@ -181,7 +187,7 @@ pub fn build_ui(scale: ScalingPlot, app: &Application, plot_data: PlotData) {
             if !data.temps.is_empty() {
                 let (r, g, b) = *color_iter.next().unwrap();
                 context.set_source_rgb(r, g, b);
-                context.set_line_width(2.0);
+                context.set_line_width(4.0);
                 for (i, &temp) in data.temps.iter().enumerate() {
                     let pct = i as f64 / num_samples as f64;
                     let x = margin_left + x_inner_pad + (pct * effect_width);

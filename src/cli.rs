@@ -50,7 +50,7 @@ pub fn args_processor(session_type: &SessionType, passers: &ArgumentPassers) {
     }
 
     if !passers.session_exists {
-        println!("Unable to find session in current path.");
+        println!("Unlabel");
         process::exit(1);
     }
     // Session validators
