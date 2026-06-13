@@ -61,14 +61,19 @@ pub fn record_frame(
 pub fn session_writter(passers: &ArgumentPassers) -> std::io::Result<SessionFile> {
     let mut session_id: u16 = 0;
 
+    // Get the absolute path to ~/Documents/Twatch/session
+    let home = PathBuf::from(std::env::var("HOME").expect("$HOME not set"));
+    let session_dir = home.join("Documents").join("Twatch").join("session");
+
     loop {
-        let condidate = format!("session/session_{}.csv", session_id);
-        if !Path::new(&condidate).exists() {
-            if let Some(parent) = Path::new(&condidate).parent() {
+        let candidate = session_dir.join(format!("session_{}.csv", session_id));
+
+        if !candidate.exists() {
+            if let Some(parent) = candidate.parent() {
                 std::fs::create_dir_all(parent)?;
             }
 
-            let mut file = File::create(&condidate)?;
+            let mut file = File::create(&candidate)?;
             writeln!(file, "# Delay:{}", passers.ms_delay)?;
             writeln!(file, "Type,Label,Temp")?;
 
@@ -82,7 +87,6 @@ pub fn session_writter(passers: &ArgumentPassers) -> std::io::Result<SessionFile
         session_id += 1;
     }
 }
-
 pub fn trigger_by_temperature(passers: &ArgumentPassers) -> std::io::Result<()> {
     print!("\r\x1B[2J\x1B[1;1H");
     let mut session = session_writter(passers)?;
@@ -141,42 +145,39 @@ pub fn trigger_by_temperature(passers: &ArgumentPassers) -> std::io::Result<()> 
 
 pub fn session_selector(arg_passers: &mut ArgumentPassers) -> io::Result<()> {
     let home = PathBuf::from(std::env::var("HOME").expect("$HOME not set"));
-    let twatch_dir = home.join("Documents").join("Twatch"); // <- Would be better if those args are
-                                                            // inherited from a cfg file instead
+    let twatch_dir = home.join("Documents").join("Twatch");
 
-    let entries = fs::read_dir(twatch_dir)?
+    if let Err(e) = fs::create_dir_all(&twatch_dir) {
+        eprintln!(
+            "Error: Could not create directory at '{:?}': {}",
+            twatch_dir, e
+        );
+    }
+
+    let entries = fs::read_dir(&twatch_dir)?
         .filter_map(|res| res.ok())
         .map(|e| e.path())
         .collect::<Vec<_>>();
 
     let found_session = entries
         .iter()
-        .any(|p| p.file_name() == Some("session".as_ref()) && p.is_dir()); // Picks a session inside
-                                                                           // Twatch dir
+        .any(|p| p.file_name() == Some("session".as_ref()) && p.is_dir());
+
     if found_session {
         arg_passers.session_exists = found_session;
-        // Return False/true based on the logic above...
     }
 
     if arg_passers.see_sessions && found_session {
-        let session_files = fs::read_dir("./session")? // Might work since the entri dir is the
-            // correct place I guess.
+        let session_dir = twatch_dir.join("session");
+        let session_files = fs::read_dir(&session_dir)?
             .filter_map(|res| res.ok())
             .map(|e| e.path())
             .filter(|p| p.extension().map_or(false, |ext| ext == "csv"));
 
-        // Once again it reads /Session
         for path in session_files {
             println!("{}", path.display());
-            // It shows the avaliable sessions
         }
     }
-
-    // I mean all this logic passer SUCK
-    // The redo will be this pipeline
-    //
-    // Serch for ~/Documents/Twatch/ (Or actually, it should be an inhereted from a config. -- But
-    // currently, lets hardcode
 
     Ok(())
 }

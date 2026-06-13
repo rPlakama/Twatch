@@ -27,6 +27,10 @@ pub struct SessionType {
 pub fn args_processor(session_type: &SessionType, passers: &ArgumentPassers) {
     // Singular works
     if let Some(session_id) = passers.plot_session {
+        if !passers.session_exists {
+            println!("No sessions available to plot.");
+            process::exit(1);
+        }
         plot_maker(
             Some(session_id),
             ScalingPlot {
@@ -37,7 +41,12 @@ pub fn args_processor(session_type: &SessionType, passers: &ArgumentPassers) {
         println!("Work is done, bye");
         process::exit(1);
     }
+
     if passers.plot_latest {
+        if !passers.session_exists {
+            println!("No sessions available to plot.");
+            process::exit(1);
+        }
         plot_maker(
             None,
             ScalingPlot {
@@ -46,11 +55,6 @@ pub fn args_processor(session_type: &SessionType, passers: &ArgumentPassers) {
             },
         );
         println!("Work is done, bye");
-        process::exit(1);
-    }
-
-    if !passers.session_exists {
-        println!("Session doesn't exist");
         process::exit(1);
     }
     // Session validators
@@ -63,7 +67,6 @@ pub fn args_processor(session_type: &SessionType, passers: &ArgumentPassers) {
         by_capture_limit(passers).expect("Unable to start session")
     }
 }
-
 pub fn help() {
     println!(
         "

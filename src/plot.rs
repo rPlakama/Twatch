@@ -48,17 +48,21 @@ pub fn parse_session_data(csv_content: &str) -> PlotData {
 
 pub fn plot_maker(session_id: Option<u16>, scale: ScalingPlot) {
     let home = PathBuf::from(std::env::var("HOME").expect("$HOME not set"));
-    let twatch_dir = home.join("Documents").join("Twatch");
+    // Add the "session" subfolder to the path
+    let session_dir = home.join("Documents").join("Twatch").join("session");
 
     let csv_content = match session_id {
         Some(id) => {
-            let path = twatch_dir.join(format!("session_{}.csv", id));
+            // Now this points to ~/Documents/Twatch/session/session_X.csv
+            let path = session_dir.join(format!("session_{}.csv", id));
             fs::read_to_string(&path)
                 .unwrap_or_else(|_| panic!("Unable to read session file: {:?}", path))
         }
         None => {
+            // Read the contents of the "session" subdirectory, not the parent "Twatch" directory
             let dir =
-                fs::read_dir(&twatch_dir).expect("Failed to read session folder (ERR plot.rs)");
+                fs::read_dir(&session_dir).expect("Failed to read session folder (ERR plot.rs)");
+
             let mut paths: Vec<_> = dir
                 .filter_map(|res| res.ok())
                 .map(|e| e.path())
@@ -81,7 +85,6 @@ pub fn plot_maker(session_id: Option<u16>, scale: ScalingPlot) {
     app.connect_activate(move |app| build_ui(scale, app, plot_data.clone()));
     app.run_with_args(&Vec::<String>::new());
 }
-
 // I plan to dith it for eGUI
 pub fn build_ui(scale: ScalingPlot, app: &Application, plot_data: PlotData) {
     // Window Title
