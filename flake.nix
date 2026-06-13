@@ -49,7 +49,7 @@
           ];
 
           shellHook = ''
-            rust-analyzer --version; gtk4 --version; gh --version; cargo --version; echo "Loaded!"; fish
+            rust-analyzer --version; gh --version; cargo --version; echo "Loaded!"; fish
           '';
         };
       }

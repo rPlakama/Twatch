@@ -50,7 +50,7 @@ pub fn args_processor(session_type: &SessionType, passers: &ArgumentPassers) {
     }
 
     if !passers.session_exists {
-        println!("Unlabel");
+        println!("Session doesn't exist");
         process::exit(1);
     }
     // Session validators

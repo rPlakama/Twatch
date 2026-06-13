@@ -1,9 +1,7 @@
 use gtk::prelude::*;
 use gtk::{Application, ApplicationWindow, DrawingArea};
 use gtk4::{self as gtk, Frame};
-use std::collections::HashMap;
-use std::fs;
-use std::path::PathBuf;
+use std::{collections::HashMap, fs, path::PathBuf};
 
 #[derive(Clone)]
 pub struct SensorData {
@@ -84,6 +82,7 @@ pub fn plot_maker(session_id: Option<u16>, scale: ScalingPlot) {
     app.run_with_args(&Vec::<String>::new());
 }
 
+// I plan to dith it for eGUI
 pub fn build_ui(scale: ScalingPlot, app: &Application, plot_data: PlotData) {
     // Window Title
     let content = Frame::new(Some("Current Session ID "));

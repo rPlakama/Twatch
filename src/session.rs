@@ -6,7 +6,7 @@ use crate::{
 use std::{
     fs::{self, File},
     io::{self, Write},
-    path::Path,
+    path::{Path, PathBuf},
     time::Instant,
 };
 
@@ -140,33 +140,43 @@ pub fn trigger_by_temperature(passers: &ArgumentPassers) -> std::io::Result<()> 
 }
 
 pub fn session_selector(arg_passers: &mut ArgumentPassers) -> io::Result<()> {
-    //let entries = fs::read_dir(".")?
-    //    .filter_map(|res| res.ok())
-    //    .map(|e| e.path())
-    //    .collect::<Vec<_>>();
+    let home = PathBuf::from(std::env::var("HOME").expect("$HOME not set"));
+    let twatch_dir = home.join("Documents").join("Twatch"); // <- Would be better if those args are
+                                                            // inherited from a cfg file instead
 
-    //let found_session = entries
-    //    .iter()
-    //    .any(|p| p.file_name() == Some("session".as_ref()) && p.is_dir());
+    let entries = fs::read_dir(twatch_dir)?
+        .filter_map(|res| res.ok())
+        .map(|e| e.path())
+        .collect::<Vec<_>>();
 
-    // Now it shall be returning false or true if 'session' exists inside of Documents/Twatch as
-    // made in plot.rs
-
+    let found_session = entries
+        .iter()
+        .any(|p| p.file_name() == Some("session".as_ref()) && p.is_dir()); // Picks a session inside
+                                                                           // Twatch dir
     if found_session {
         arg_passers.session_exists = found_session;
+        // Return False/true based on the logic above...
     }
 
     if arg_passers.see_sessions && found_session {
-        let session_files = fs::read_dir("./session")?
+        let session_files = fs::read_dir("./session")? // Might work since the entri dir is the
+            // correct place I guess.
             .filter_map(|res| res.ok())
             .map(|e| e.path())
             .filter(|p| p.extension().map_or(false, |ext| ext == "csv"));
+
+        // Once again it reads /Session
         for path in session_files {
             println!("{}", path.display());
+            // It shows the avaliable sessions
         }
     }
 
-    // I mean all this logic passer SUCKS
+    // I mean all this logic passer SUCK
+    // The redo will be this pipeline
+    //
+    // Serch for ~/Documents/Twatch/ (Or actually, it should be an inhereted from a config. -- But
+    // currently, lets hardcode
 
     Ok(())
 }
