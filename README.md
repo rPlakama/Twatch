@@ -1,32 +1,34 @@
-Tasks:
+# twatch
 
-[x] -- Better TUI
-[x] -- Zoom In, Zoom out GTK  (now via matplotlib toolbar)
-[x] -- Less commands, more rational
-[x] -- Add 'Don't create graph option'
-[x] -- Add 'Create TUI graph'
-[x] -- Add 'Create GTK graph' into session commands
-[x] -- More logical commands
-[x] -- Empty Twatch shall run a session list
+Temperature monitoring and graphing tool.
 
-Usage:
+## Commands
 
-  twatch               List recorded sessions
-  twatch run           Start capture-limit recording (default 250 captures)
-  twatch run -t        Start temperature-triggered recording
-  twatch run -c <N>    Start capture-limit with N captures
-  twatch run --no-graph  Skip graph after session
-  twatch graph [ID]    Plot session (matplotlib, toolbar: zoom/pan/save)
-  twatch temp          Show current CPU temperature
-  twatch list          List sessions
+| Command          | Description                                |
+| ---------------- | ------------------------------------------ |
+| `twatch`         | List recorded sessions (default)           |
+| `twatch run`     | Start a recording session (250 captures by default) |
+| `twatch run -t`  | Temperature-triggered recording            |
+| `twatch run -c N`| Recording limited to N captures            |
+| `twatch graph [ID...]` | Plot sessions in a matplotlib window (latest if omitted) |
+| `twatch temp`    | Show current CPU temperature               |
+| `twatch completions <shell>` | Generate shell completions (bash, zsh, fish) |
 
-Options:
-  -d, --delay <ms>     Delay between captures (default: 250)
-  -i, --initial <C>    Initial/trigger temperature (default: 40)
-  -e, --end <C>        End temperature (default: 70)
-  --no-graph           Don't show graph after session
-  --max-temp <C>       Max Y-axis temperature (default: 110)
-  --temp-steps <N>     Grid step interval (default: 5)
+## Run options
 
-Plot colors:
-  CPU = red,  GPU = green,  Other sensors = 50% opacity gray
+| Option          | Description                                            |
+| --------------- | ------------------------------------------------------ |
+| `-d, --delay <ms>` | Milliseconds between captures (default: 250)         |
+| `-i, --initial <C>` | Start temperature for `--by-temperature` (default: 40) |
+| `-e, --end <C>` | Stop temperature for `--by-temperature` (default: 70)  |
+| `--sensor <name>` | Target sensor for `--by-temperature`: cpu, gpu, nvme  |
+| `--json`        | Output JSON records to stdout instead of TUI           |
+| `--no-graph`    | Skip launching the graph after a session               |
+| `--max-temp <C>`| Max Y-axis temperature (default: 110)                  |
+| `--temp-steps <N>` | Grid step interval on the Y-axis (default: 5)       |
+
+## Plot colors
+
+- CPU = red
+- GPU = green
+- Other sensors = 50% opacity gray

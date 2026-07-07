@@ -50,23 +50,15 @@ struct Cli {
 enum Commands {
     #[command(about = "Start a temperature recording session")]
     Run {
-        #[arg(short = 't', long, conflicts_with_all = ["count", "duration"], help = "Stop recording when temperature falls outside the initial–end range")]
+        #[arg(short = 't', long, conflicts_with = "count", help = "Stop recording when temperature falls outside the initial-end range")]
         by_temperature: bool,
 
         #[arg(
             short = 'c',
             long,
-            conflicts_with = "duration",
             help = "Number of captures before stopping"
         )]
         count: Option<u16>,
-
-        #[arg(
-            long,
-            conflicts_with = "count",
-            help = "Run for a specified number of seconds"
-        )]
-        duration: Option<u64>,
 
         #[arg(
             short = 'i',
@@ -154,18 +146,12 @@ fn main() {
         Commands::Run {
             by_temperature,
             count,
-            duration,
             initial_temp,
             end_temp,
             sensor,
             json,
         } => {
-            // Needs fixing, the time is broken
-            let capture_limit = if let Some(secs) = duration {
-                ((secs * 1000) / config.delay).max(1) as u16
-            } else {
-                count.unwrap_or(250)
-            };
+            let capture_limit = count.unwrap_or(250);
 
             run_session(
                 &config,
