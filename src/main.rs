@@ -13,16 +13,36 @@ struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
 
-    #[arg(short = 'd', long, default_value = "250", global = true, help = "Milliseconds between sensor captures")]
+    #[arg(
+        short = 'd',
+        long,
+        default_value = "250",
+        global = true,
+        help = "Milliseconds between sensor captures"
+    )]
     delay: u64,
 
-    #[arg(long = "no-graph", global = true, help = "Skip launching the matplotlib graph after a session")]
+    #[arg(
+        long = "no-graph",
+        global = true,
+        help = "Skip launching the matplotlib graph after a session"
+    )]
     no_graph: bool,
 
-    #[arg(long = "max-temp", default_value = "110", global = true, help = "Maximum temperature (°C) on the plot Y-axis")]
+    #[arg(
+        long = "max-temp",
+        default_value = "110",
+        global = true,
+        help = "Maximum temperature (°C) on the plot Y-axis"
+    )]
     max_plot_temp: u16,
 
-    #[arg(long = "temp-steps", default_value = "5", global = true, help = "Grid step interval (°C) on the plot Y-axis")]
+    #[arg(
+        long = "temp-steps",
+        default_value = "5",
+        global = true,
+        help = "Grid step interval (°C) on the plot Y-axis"
+    )]
     temp_steps: u16,
 }
 
@@ -33,19 +53,42 @@ enum Commands {
         #[arg(short = 't', long, conflicts_with_all = ["count", "duration"], help = "Stop recording when temperature falls outside the initial–end range")]
         by_temperature: bool,
 
-        #[arg(short = 'c', long, conflicts_with = "duration", help = "Number of captures before stopping")]
+        #[arg(
+            short = 'c',
+            long,
+            conflicts_with = "duration",
+            help = "Number of captures before stopping"
+        )]
         count: Option<u16>,
 
-        #[arg(long, conflicts_with = "count", help = "Run for a specified number of seconds")]
+        #[arg(
+            long,
+            conflicts_with = "count",
+            help = "Run for a specified number of seconds"
+        )]
         duration: Option<u64>,
 
-        #[arg(short = 'i', long = "initial", default_value = "40", help = "Start temperature (°C) for --by-temperature mode")]
+        #[arg(
+            short = 'i',
+            long = "initial",
+            default_value = "40",
+            help = "Start temperature (°C) for --by-temperature mode"
+        )]
         initial_temp: u32,
 
-        #[arg(short = 'e', long = "end", default_value = "70", help = "Stop temperature (°C) for --by-temperature mode")]
+        #[arg(
+            short = 'e',
+            long = "end",
+            default_value = "70",
+            help = "Stop temperature (°C) for --by-temperature mode"
+        )]
         end_temp: u32,
 
-        #[arg(long, default_value = "cpu", help = "Target sensor for --by-temperature mode: cpu, gpu, or nvme")]
+        #[arg(
+            long,
+            default_value = "cpu",
+            help = "Target sensor for --by-temperature mode: cpu, gpu, or nvme"
+        )]
         sensor: String,
 
         #[arg(long, help = "Output JSON records to stdout instead of TUI")]
@@ -100,7 +143,11 @@ fn main() {
 
         Commands::Temp => {
             let sensors = search_sensors().expect("Unable to receive sensors information");
-            let cpu_temp = sensors.iter().find(|s| s.is_cpu).map(|s| s.temp).unwrap_or(0);
+            let cpu_temp = sensors
+                .iter()
+                .find(|s| s.is_cpu)
+                .map(|s| s.temp)
+                .unwrap_or(0);
             println!("CPU TEMP: {}°C", cpu_temp);
         }
 
@@ -113,6 +160,7 @@ fn main() {
             sensor,
             json,
         } => {
+            // Needs fixing, the time is broken
             let capture_limit = if let Some(secs) = duration {
                 ((secs * 1000) / config.delay).max(1) as u16
             } else {
@@ -132,8 +180,7 @@ fn main() {
         }
 
         Commands::Graph { session_ids } => {
-            let session_exists =
-                list_sessions().map(|s| !s.is_empty()).unwrap_or(false);
+            let session_exists = list_sessions().map(|s| !s.is_empty()).unwrap_or(false);
             if !session_exists {
                 eprintln!("No sessions available to plot.");
                 process::exit(1);
