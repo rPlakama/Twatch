@@ -31,8 +31,13 @@
             pkg-config
           ];
           buildInputs = with pkgs; [
-            gtk4
+            python3
+            (python3.withPackages (ps: [ ps.matplotlib ]))
           ];
+          postInstall = ''
+            cp ${./plot.py} $out/bin/plot.py
+            wrapProgram $out/bin/plot.py --prefix PYTHONPATH : "$out/${pkgs.python3.sitePackages}"
+          '';
         };
 
         devShells.default = pkgs.mkShell {
@@ -44,8 +49,9 @@
             rustfmt
             rust-analyzer
             rustc
-            gtk4
             gh
+            python3
+            (python3.withPackages (ps: [ ps.matplotlib ]))
           ];
 
           shellHook = ''

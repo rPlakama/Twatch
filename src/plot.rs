@@ -1,18 +1,7 @@
-use gtk::prelude::*;
-use gtk::{Application, ApplicationWindow, DrawingArea};
-use gtk4::{self as gtk, Frame};
-use std::{cell::Cell, collections::HashMap, fs, path::PathBuf, rc::Rc};
+use std::path::PathBuf;
+use std::process::Command;
 
-#[derive(Clone)]
-pub struct SensorData {
-    type_: String,
-    temps: Vec<f64>,
-}
-
-#[derive(Clone)]
-pub struct PlotData {
-    series: HashMap<String, SensorData>,
-}
+use std::{fs, io};
 
 #[derive(Clone, Copy)]
 pub struct ScalingPlot {
@@ -20,246 +9,67 @@ pub struct ScalingPlot {
     pub number_of_steps_for_graph: u16,
 }
 
-pub fn parse_session_data(csv_content: &str) -> PlotData {
-    let mut series = HashMap::new();
+pub fn plot_maker(session_ids: &[u16], scale: ScalingPlot) {
+    let home = PathBuf::from(std::env::var("HOME").unwrap_or_default());
+    let session_dir = home.join("Documents").join("Twatch").join("session");
 
-    for line in csv_content.lines() {
-        if line.starts_with('#') || line.starts_with("Type,") {
-            continue;
+    let paths: Vec<PathBuf> = if session_ids.is_empty() {
+        vec![find_latest(&session_dir).expect("No session files found")]
+    } else {
+        session_ids
+            .iter()
+            .map(|id| session_dir.join(format!("session_{}.csv", id)))
+            .collect()
+    };
+
+    let script = find_plot_script();
+    let mut cmd = Command::new("python3");
+    cmd.arg(&script)
+        .arg("--max-temp")
+        .arg(scale.max_plot_temperature.to_string())
+        .arg("--temp-steps")
+        .arg(scale.number_of_steps_for_graph.to_string());
+
+    for p in &paths {
+        cmd.arg(p);
+    }
+
+    match cmd.spawn() {
+        Ok(mut child) => {
+            let _ = child.wait();
         }
+        Err(e) => {
+            eprintln!("Failed to launch plot: {}. Is python3+matplotlib installed?", e);
+        }
+    }
+}
 
-        let parts: Vec<&str> = line.split(',').collect();
-        if parts.len() >= 3 {
-            let type_ = parts[0].to_string();
-            let label = parts[1].to_string();
+fn find_latest(dir: &PathBuf) -> io::Result<PathBuf> {
+    let mut paths: Vec<_> = fs::read_dir(dir)?
+        .filter_map(|r| r.ok())
+        .map(|e| e.path())
+        .filter(|p| p.extension().map_or(false, |ext| ext == "csv"))
+        .collect();
+    paths.sort();
+    paths.last().cloned().ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "no sessions"))
+}
 
-            if let Ok(temp) = parts[2].parse::<f64>() {
-                let entry = series.entry(label).or_insert_with(|| SensorData {
-                    type_,
-                    temps: Vec::new(),
-                });
-                entry.temps.push(temp);
-            }
+fn find_plot_script() -> PathBuf {
+    let exe = std::env::current_exe().unwrap_or_default();
+    let exe_dir = exe.parent().unwrap_or_else(|| std::path::Path::new("."));
+
+    let candidates = [
+        exe_dir.join("plot.py"),
+        exe_dir.join("../plot.py"),
+        exe_dir.join("../../plot.py"),
+        std::env::current_dir().unwrap_or_default().join("plot.py"),
+    ];
+
+    for c in &candidates {
+        if c.exists() {
+            return c.clone();
         }
     }
 
-    PlotData { series }
-}
-
-pub fn plot_maker(session_id: Option<u16>, scale: ScalingPlot) {
-    let home = PathBuf::from(std::env::var("HOME").expect("$HOME not set"));
-    let session_dir = home.join("Documents").join("Twatch").join("session");
-
-    let csv_content = match session_id {
-        Some(id) => {
-            let path = session_dir.join(format!("session_{}.csv", id));
-            fs::read_to_string(&path)
-                .unwrap_or_else(|_| panic!("Unable to read session file: {:?}", path))
-        }
-        None => {
-            let dir =
-                fs::read_dir(&session_dir).expect("Failed to read session folder (ERR plot.rs)");
-
-            let mut paths: Vec<_> = dir
-                .filter_map(|res| res.ok())
-                .map(|e| e.path())
-                .filter(|p| p.extension().map_or(false, |ext| ext == "csv"))
-                .collect();
-
-            paths.sort();
-
-            let latest = paths.last().expect("No session files found");
-            fs::read_to_string(latest).expect("Unable to read latest session")
-        }
-    };
-
-    let plot_data = parse_session_data(&csv_content);
-
-    let app = Application::builder()
-        .application_id("com.plot.twatch")
-        .build();
-
-    app.connect_activate(move |app| build_ui(scale, app, plot_data.clone()));
-    app.run_with_args(&Vec::<String>::new());
-}
-
-pub fn build_ui(scale: ScalingPlot, app: &Application, plot_data: PlotData) {
-    let content = Frame::new(Some("Current Session ID "));
-    let drawing_area = DrawingArea::new();
-
-    let zoom_level = Rc::new(Cell::new(1.0f64));
-    let pan_x = Rc::new(Cell::new(0.0f64));
-    let pan_y = Rc::new(Cell::new(0.0f64));
-
-    let scroll = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::VERTICAL);
-    let zl = zoom_level.clone();
-    scroll.connect_scroll(move |_, _dx, dy| {
-        let current = zl.get();
-        let new = if dy > 0.0 {
-            current * 1.15
-        } else {
-            current / 1.15
-        };
-        zl.set(new.clamp(0.3, 10.0));
-        gtk::glib::Propagation::Stop
-    });
-    drawing_area.add_controller(scroll);
-
-    let drag = gtk::GestureDrag::new();
-    let px = pan_x.clone();
-    let py = pan_y.clone();
-    drag.connect_drag_update(move |_, dx, dy| {
-        let new_x = px.get() + dx as f64;
-        let new_y = py.get() + dy as f64;
-        px.set(new_x.clamp(-500.0, 500.0));
-        py.set(new_y.clamp(-500.0, 500.0));
-    });
-    drawing_area.add_controller(drag);
-
-    drawing_area.set_draw_func(move |_area, context, width, height| {
-        let w = width as f64;
-        let h = height as f64;
-
-        context.set_source_rgb(1.0, 1.0, 1.0);
-        context.paint().expect("Failed to paint");
-
-        let zoom = zoom_level.get();
-        let pan_x_val = pan_x.get();
-        let pan_y_val = pan_y.get();
-
-        let margin_left = 60.0;
-        let margin_right = 40.0;
-        let margin_top = 40.0;
-        let margin_bottom = 50.0;
-
-        let plot_width = (w - margin_left - margin_right) * zoom;
-        let plot_height = (h - margin_top - margin_bottom) * zoom;
-
-        context.save().expect("Failed to save context");
-        context.translate(pan_x_val, pan_y_val);
-
-        let x_inner_pad = 30.0;
-        let effect_width = plot_width - (x_inner_pad * 2.0);
-
-        context.set_source_rgb(0.0, 0.0, 0.0);
-        context.set_line_width(2.0);
-        context.move_to(margin_left, margin_top);
-        context.line_to(margin_left, h - margin_bottom);
-        context.line_to(w - margin_right, h - margin_bottom);
-        context.stroke().expect("Failed to stroke axes");
-
-        context.set_line_width(0.5);
-        context.set_source_rgb(0.8, 0.8, 0.8);
-
-        let step_val = f64::from(scale.number_of_steps_for_graph);
-        let max_temp = f64::from(scale.max_plot_temperature);
-        let num_lines = (max_temp / step_val).floor() as usize;
-
-        for i in 0..=num_lines {
-            let temp = (i as f64) * step_val;
-            let y = h - margin_bottom - (temp / max_temp) * plot_height;
-
-            context.move_to(margin_left, y);
-            context.line_to(w - margin_right, y);
-            context.stroke().expect("Failed to stroke grid");
-
-            context.set_source_rgb(0.0, 0.0, 0.0);
-            context.move_to(margin_left - 35.0, y + 5.0);
-            context
-                .show_text(&format!("{}°C", temp))
-                .expect("Failed to show text");
-            context.set_source_rgb(0.8, 0.8, 0.8);
-        }
-
-        let num_samples = plot_data
-            .series
-            .values()
-            .map(|data| data.temps.len())
-            .max()
-            .unwrap_or(0)
-            .max(1);
-        let sample_step = if num_samples > 10 {
-            num_samples / 10
-        } else {
-            1
-        };
-
-        for i in (0..=num_samples).step_by(sample_step) {
-            let pct = i as f64 / num_samples as f64;
-            let x = margin_left + x_inner_pad + (pct * effect_width);
-
-            context.move_to(x, margin_top);
-            context.line_to(x, h - margin_bottom);
-            context.stroke().expect("Failed to stroke grid");
-
-            context.set_source_rgb(0.0, 0.0, 0.0);
-            context.move_to(x - 10.0, h - margin_bottom + 20.0);
-            context
-                .show_text(&format!("{}", i))
-                .expect("Failed to show text");
-            context.set_source_rgb(0.8, 0.8, 0.8);
-        }
-
-        let colors = vec![
-            (1.0, 0.5, 0.5),
-            (0.2, 0.8, 0.2),
-            (0.5, 0.5, 1.0),
-            (1.0, 1.0, 0.2),
-            (1.0, 0.5, 1.0),
-            (0.5, 1.0, 1.0),
-        ];
-        let mut color_iter = colors.iter().cycle();
-
-        for (_label, data) in &plot_data.series {
-            if !data.temps.is_empty() {
-                let (r, g, b) = *color_iter.next().unwrap();
-                context.set_source_rgb(r, g, b);
-                context.set_line_width(4.0);
-                for (i, &temp) in data.temps.iter().enumerate() {
-                    let pct = i as f64 / num_samples as f64;
-                    let x = margin_left + x_inner_pad + (pct * effect_width);
-                    let y = h - margin_bottom - (temp / max_temp) * plot_height;
-
-                    if i == 0 {
-                        context.move_to(x, y);
-                    } else {
-                        context.line_to(x, y);
-                    }
-                }
-                context.stroke().expect("Failed to stroke line");
-            }
-        }
-
-        let legend_x = w - margin_right - 120.0;
-        let mut legend_y = margin_top + 20.0;
-        let mut color_iter = colors.iter().cycle();
-
-        for (label_key, data) in &plot_data.series {
-            let (r, g, b) = *color_iter.next().unwrap();
-            context.set_source_rgb(r, g, b);
-            context.rectangle(legend_x, legend_y, 20.0, 10.0);
-            context.fill().expect("Failed to fill");
-
-            context.set_source_rgb(0.0, 0.0, 0.0);
-            context.move_to(legend_x + 25.0, legend_y + 10.0);
-            context
-                .show_text(&format!("{}.{}", data.type_, label_key))
-                .expect("Failed to show text");
-            legend_y += 20.0;
-        }
-
-        context.restore().expect("Failed to restore context");
-    });
-
-    content.set_child(Some(&drawing_area));
-
-    let window = ApplicationWindow::builder()
-        .application(app)
-        .title("Twatch Temperature Plot (scroll=zoom, drag=pan)")
-        .default_width(1000)
-        .default_height(400)
-        .child(&content)
-        .build();
-
-    window.present();
+    PathBuf::from("plot.py")
 }

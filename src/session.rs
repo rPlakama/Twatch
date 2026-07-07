@@ -1,8 +1,7 @@
 use crate::{
     plot::{plot_maker, ScalingPlot},
     sensors::{device_type, search_sensors, SensorLabel},
-    tui_graph,
-    Config, GraphType,
+    Config,
 };
 use crossterm::{
     event::{self, Event, KeyCode},
@@ -104,6 +103,27 @@ fn record_frame(session: &mut SessionFile, sensors: &[SensorLabel]) -> io::Resul
     Ok(())
 }
 
+fn format_json_frame(sensors: &[SensorLabel], elapsed: u16) -> String {
+    let mut parts = vec![format!("\"elapsed\":{}", elapsed)];
+    for s in sensors {
+        let d_type = device_type(s);
+        if d_type == "Unknown" {
+            continue;
+        }
+        let key = format!("{}_{}", d_type.to_lowercase(), s.label.to_lowercase());
+        parts.push(format!("\"{}\":{}", key, s.temp));
+    }
+    format!("{{{}}}", parts.join(", "))
+}
+
+fn target_temp(sensors: &[SensorLabel], sensor_kind: &str) -> u32 {
+    match sensor_kind {
+        "gpu" => sensors.iter().find(|s| s.is_amd_gpu).map(|s| s.temp).unwrap_or(0),
+        "nvme" => sensors.iter().find(|s| s.is_nvme).map(|s| s.temp).unwrap_or(0),
+        _ => sensors.iter().find(|s| s.is_cpu).map(|s| s.temp).unwrap_or(0),
+    }
+}
+
 fn draw_live_frame(frame: &mut Frame, sensors: &[SensorLabel], status: &str, subtitle: &str) {
     let area = frame.area();
 
@@ -145,12 +165,7 @@ fn draw_live_frame(frame: &mut Frame, sensors: &[SensorLabel], status: &str, sub
         )
         .split(layout[1]);
 
-    let max_temp: u32 = sensors
-        .iter()
-        .map(|s| s.temp)
-        .max()
-        .unwrap_or(100)
-        .max(100);
+    let max_temp: u32 = sensors.iter().map(|s| s.temp).max().unwrap_or(100).max(100);
 
     let mut row = 0;
     for sensor in sensors {
@@ -203,17 +218,21 @@ fn draw_live_frame(frame: &mut Frame, sensors: &[SensorLabel], status: &str, sub
 pub fn run_session(
     config: &Config,
     by_temperature: bool,
-    count: Option<u16>,
+    capture_limit: u16,
     initial_temp: u32,
     end_temp: u32,
-    graph_type: Option<GraphType>,
+    sensor_kind: &str,
+    json_output: bool,
 ) -> io::Result<()> {
-    let capture_limit = count.unwrap_or(250);
     let ms_delay = config.delay;
 
-    enable_raw_mode()?;
+    if !json_output {
+        enable_raw_mode()?;
+    }
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen)?;
+    if !json_output {
+        execute!(stdout, EnterAlternateScreen)?;
+    }
 
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
@@ -227,56 +246,57 @@ pub fn run_session(
         loop {
             let sensors = search_sensors()?;
             record_frame(&mut session, &sensors)?;
-            let cpu_temp = sensors
-                .iter()
-                .find(|s| s.is_cpu)
-                .map(|s| s.temp)
-                .unwrap_or(0);
+            let target = target_temp(&sensors, sensor_kind);
 
-            let status = if by_temperature {
-                format!(
-                    "Temp Trigger  |  CPU: {}°C  |  Range: [{}, {}]°C",
-                    cpu_temp, initial_temp, end_temp
-                )
+            if json_output {
+                println!("{}", format_json_frame(&sensors, elapsed));
             } else {
-                format!(
-                    "Capture Limit  |  {}/{}  |  CPU: {}°C",
-                    elapsed, capture_limit, cpu_temp
-                )
-            };
+                let sensor_label = match sensor_kind {
+                    "gpu" => "GPU",
+                    "nvme" => "NVMe",
+                    _ => "CPU",
+                };
 
-            let subtitle = format!(
-                "Delay: {}ms  |  Session {}  |  q=quit",
-                ms_delay, session_id
-            );
+                let status = if by_temperature {
+                    format!(
+                        "Temp Trigger [{}]  |  T: {}°C  |  Range: [{}, {}]°C",
+                        sensor_label, target, initial_temp, end_temp
+                    )
+                } else {
+                    format!(
+                        "Capture Limit  |  {}/{}  |  T: {}°C",
+                        elapsed, capture_limit, target
+                    )
+                };
 
-            terminal
-                .draw(|f| draw_live_frame(f, &sensors, &status, &subtitle))
-                .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+                let subtitle = format!("Delay: {}ms  |  Session {}  |  q=quit", ms_delay, session_id);
 
-            if event::poll(std::time::Duration::from_millis(ms_delay / 4))
-                .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?
-            {
-                if let Event::Key(key) =
-                    event::read().map_err(|e| io::Error::new(io::ErrorKind::Other, e))?
+                terminal
+                    .draw(|f| draw_live_frame(f, &sensors, &status, &subtitle))
+                    .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+            }
+
+            if !json_output {
+                if event::poll(std::time::Duration::from_millis(ms_delay / 4))
+                    .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?
                 {
-                    if key.code == KeyCode::Char('q') || key.code == KeyCode::Esc {
-                        let _ = flush_buffer(&mut session);
-                        return Ok(false);
+                    if let Event::Key(key) =
+                        event::read().map_err(|e| io::Error::new(io::ErrorKind::Other, e))?
+                    {
+                        if key.code == KeyCode::Char('q') || key.code == KeyCode::Esc {
+                            let _ = flush_buffer(&mut session);
+                            return Ok(false);
+                        }
                     }
                 }
             }
 
             std::thread::sleep(std::time::Duration::from_millis(ms_delay * 3 / 4));
 
-            if by_temperature && cpu_temp >= end_temp {
+            if by_temperature && target >= end_temp {
                 flush_buffer(&mut session)?;
-                writeln!(
-                    session.file,
-                    "#Total: {:.3}",
-                    total_start.elapsed().as_secs()
-                )?;
-                writeln!(session.file, "CPU,Exit,{}", cpu_temp)?;
+                writeln!(session.file, "#Total: {:.3}", total_start.elapsed().as_secs())?;
+                writeln!(session.file, "CPU,Exit,{}", target)?;
                 return Ok(true);
             }
 
@@ -284,21 +304,19 @@ pub fn run_session(
                 elapsed += 1;
                 if elapsed >= capture_limit {
                     flush_buffer(&mut session)?;
-                    writeln!(
-                        session.file,
-                        "#Total: {:.3}",
-                        total_start.elapsed().as_secs()
-                    )?;
-                    writeln!(session.file, "CPU,Exit,{}", cpu_temp)?;
+                    writeln!(session.file, "#Total: {:.3}", total_start.elapsed().as_secs())?;
+                    writeln!(session.file, "CPU,Exit,{}", target)?;
                     return Ok(true);
                 }
             }
         }
     })();
 
-    disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-    terminal.show_cursor().ok();
+    if !json_output {
+        disable_raw_mode()?;
+        execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+        terminal.show_cursor().ok();
+    }
 
     let completed = result?;
 
@@ -307,15 +325,7 @@ pub fn run_session(
             max_plot_temperature: config.max_plot_temp,
             number_of_steps_for_graph: config.temp_steps,
         };
-
-        match graph_type {
-            Some(GraphType::Tui) => {
-                let _ = tui_graph::show_graph(Some(session_id));
-            }
-            _ => {
-                plot_maker(Some(session_id), scale);
-            }
-        }
+        plot_maker(&[session_id], scale);
     }
 
     Ok(())

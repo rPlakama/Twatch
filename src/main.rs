@@ -1,12 +1,11 @@
 mod plot;
 mod sensors;
 mod session;
-mod tui_graph;
 
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use sensors::search_sensors;
 use session::{list_sessions, run_session};
-use std::process;
+use std::{io, process};
 
 #[derive(Parser)]
 #[command(name = "twatch", about = "Temperature monitoring and graphing tool")]
@@ -31,11 +30,14 @@ struct Cli {
 enum Commands {
     #[command(about = "Start a temperature recording session")]
     Run {
-        #[arg(short = 't', long, conflicts_with = "count")]
+        #[arg(short = 't', long, conflicts_with_all = ["count", "duration"])]
         by_temperature: bool,
 
-        #[arg(short = 'c', long)]
+        #[arg(short = 'c', long, conflicts_with = "duration")]
         count: Option<u16>,
+
+        #[arg(long, conflicts_with = "count")]
+        duration: Option<u64>,
 
         #[arg(short = 'i', long = "initial", default_value = "40")]
         initial_temp: u32,
@@ -43,20 +45,23 @@ enum Commands {
         #[arg(short = 'e', long = "end", default_value = "70")]
         end_temp: u32,
 
-        #[arg(long = "graph-type", value_enum)]
-        graph_type: Option<GraphType>,
+        #[arg(long, default_value = "cpu")]
+        sensor: String,
+
+        #[arg(long)]
+        json: bool,
     },
 
-    #[command(about = "Plot session data (GTK window)")]
+    #[command(about = "Plot session data (matplotlib window)")]
     Graph {
-        #[arg(help = "Session ID (latest if omitted)")]
-        session_id: Option<u16>,
+        #[arg(help = "Session IDs (latest if omitted)")]
+        session_ids: Vec<u16>,
     },
 
-    #[command(name = "graph-tui", about = "Plot session data (terminal)")]
-    GraphTui {
-        #[arg(help = "Session ID (latest if omitted)")]
-        session_id: Option<u16>,
+    #[command(about = "Generate shell completions")]
+    Completions {
+        #[arg(value_enum)]
+        shell: Shell,
     },
 
     #[command(about = "List recorded sessions")]
@@ -67,9 +72,10 @@ enum Commands {
 }
 
 #[derive(Clone, ValueEnum)]
-pub enum GraphType {
-    Gtk,
-    Tui,
+enum Shell {
+    Bash,
+    Zsh,
+    Fish,
 }
 
 pub struct Config {
@@ -90,61 +96,50 @@ fn main() {
     };
 
     match cli.command.unwrap_or(Commands::List) {
-        Commands::List => {
-            match list_sessions() {
-                Ok(sessions) => {
-                    if sessions.is_empty() {
-                        println!("No sessions found. Run 'twatch run' to create one.");
-                    } else {
-                        println!("Sessions:");
-                        for (id, path) in &sessions {
-                            println!("  [{}] {}", id, path.display());
-                        }
-                    }
-                }
-                Err(e) => eprintln!("Error listing sessions: {}", e),
-            }
-        }
+        Commands::List => print_sessions(),
 
         Commands::Temp => {
-            let sensors =
-                search_sensors().expect("Unable to receive sensors information");
-            let cpu_temp = sensors
-                .iter()
-                .find(|s| s.is_cpu)
-                .map(|s| s.temp)
-                .expect("Unable to read CPU temperature");
+            let sensors = search_sensors().expect("Unable to receive sensors information");
+            let cpu_temp = sensors.iter().find(|s| s.is_cpu).map(|s| s.temp).unwrap_or(0);
             println!("CPU TEMP: {}°C", cpu_temp);
         }
 
         Commands::Run {
             by_temperature,
             count,
+            duration,
             initial_temp,
             end_temp,
-            graph_type,
+            sensor,
+            json,
         } => {
+            let capture_limit = if let Some(secs) = duration {
+                ((secs * 1000) / config.delay).max(1) as u16
+            } else {
+                count.unwrap_or(250)
+            };
+
             run_session(
                 &config,
                 by_temperature,
-                count,
+                capture_limit,
                 initial_temp,
                 end_temp,
-                graph_type,
+                &sensor,
+                json,
             )
             .expect("Session failed");
         }
 
-        Commands::Graph { session_id } => {
-            let session_exists = list_sessions()
-                .map(|s| !s.is_empty())
-                .unwrap_or(false);
+        Commands::Graph { session_ids } => {
+            let session_exists =
+                list_sessions().map(|s| !s.is_empty()).unwrap_or(false);
             if !session_exists {
                 eprintln!("No sessions available to plot.");
                 process::exit(1);
             }
             plot::plot_maker(
-                session_id,
+                &session_ids,
                 plot::ScalingPlot {
                     max_plot_temperature: config.max_plot_temp,
                     number_of_steps_for_graph: config.temp_steps,
@@ -152,15 +147,31 @@ fn main() {
             );
         }
 
-        Commands::GraphTui { session_id } => {
-            let session_exists = list_sessions()
-                .map(|s| !s.is_empty())
-                .unwrap_or(false);
-            if !session_exists {
-                eprintln!("No sessions available to plot.");
-                process::exit(1);
+        Commands::Completions { shell } => {
+            use clap_complete::{generate, shells};
+            let mut cmd = Cli::command();
+            let name = "twatch";
+            match shell {
+                Shell::Bash => generate(shells::Bash, &mut cmd, name, &mut io::stdout()),
+                Shell::Zsh => generate(shells::Zsh, &mut cmd, name, &mut io::stdout()),
+                Shell::Fish => generate(shells::Fish, &mut cmd, name, &mut io::stdout()),
             }
-            tui_graph::show_graph(session_id).expect("Failed to show TUI graph");
         }
+    }
+}
+
+fn print_sessions() {
+    match list_sessions() {
+        Ok(sessions) => {
+            if sessions.is_empty() {
+                println!("No sessions found. Run 'twatch run' to create one.");
+            } else {
+                println!("Sessions:");
+                for (id, path) in &sessions {
+                    println!("  [{}] {}", id, path.display());
+                }
+            }
+        }
+        Err(e) => eprintln!("Error listing sessions: {}", e),
     }
 }
