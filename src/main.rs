@@ -13,16 +13,16 @@ struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
 
-    #[arg(short = 'd', long, default_value = "250", global = true)]
+    #[arg(short = 'd', long, default_value = "250", global = true, help = "Milliseconds between sensor captures")]
     delay: u64,
 
-    #[arg(long = "no-graph", global = true)]
+    #[arg(long = "no-graph", global = true, help = "Skip launching the matplotlib graph after a session")]
     no_graph: bool,
 
-    #[arg(long = "max-temp", default_value = "110", global = true)]
+    #[arg(long = "max-temp", default_value = "110", global = true, help = "Maximum temperature (°C) on the plot Y-axis")]
     max_plot_temp: u16,
 
-    #[arg(long = "temp-steps", default_value = "5", global = true)]
+    #[arg(long = "temp-steps", default_value = "5", global = true, help = "Grid step interval (°C) on the plot Y-axis")]
     temp_steps: u16,
 }
 
@@ -30,25 +30,25 @@ struct Cli {
 enum Commands {
     #[command(about = "Start a temperature recording session")]
     Run {
-        #[arg(short = 't', long, conflicts_with_all = ["count", "duration"])]
+        #[arg(short = 't', long, conflicts_with_all = ["count", "duration"], help = "Stop recording when temperature falls outside the initial–end range")]
         by_temperature: bool,
 
-        #[arg(short = 'c', long, conflicts_with = "duration")]
+        #[arg(short = 'c', long, conflicts_with = "duration", help = "Number of captures before stopping")]
         count: Option<u16>,
 
-        #[arg(long, conflicts_with = "count")]
+        #[arg(long, conflicts_with = "count", help = "Run for a specified number of seconds")]
         duration: Option<u64>,
 
-        #[arg(short = 'i', long = "initial", default_value = "40")]
+        #[arg(short = 'i', long = "initial", default_value = "40", help = "Start temperature (°C) for --by-temperature mode")]
         initial_temp: u32,
 
-        #[arg(short = 'e', long = "end", default_value = "70")]
+        #[arg(short = 'e', long = "end", default_value = "70", help = "Stop temperature (°C) for --by-temperature mode")]
         end_temp: u32,
 
-        #[arg(long, default_value = "cpu")]
+        #[arg(long, default_value = "cpu", help = "Target sensor for --by-temperature mode: cpu, gpu, or nvme")]
         sensor: String,
 
-        #[arg(long)]
+        #[arg(long, help = "Output JSON records to stdout instead of TUI")]
         json: bool,
     },
 
