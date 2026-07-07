@@ -16,6 +16,7 @@
       system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
+        pythonWithMatplotlib = pkgs.python3.withPackages (ps: [ ps.matplotlib ]);
       in
       {
         formatter = pkgs.alejandra;
@@ -29,14 +30,18 @@
           cargoLock.lockFile = ./Cargo.lock;
           nativeBuildInputs = with pkgs; [
             pkg-config
+            makeBinaryWrapper
+            installShellFiles
           ];
           buildInputs = with pkgs; [
-            python3
-            (python3.withPackages (ps: [ ps.matplotlib ]))
+            pythonWithMatplotlib
           ];
           postInstall = ''
             cp ${./plot.py} $out/bin/plot.py
-            wrapProgram $out/bin/plot.py --prefix PYTHONPATH : "$out/${pkgs.python3.sitePackages}"
+            wrapProgram $out/bin/twatch --prefix PATH : ${pythonWithMatplotlib}/bin
+            installShellCompletion --cmd twatch --bash <($out/bin/twatch completions bash)
+            installShellCompletion --cmd twatch --zsh  <($out/bin/twatch completions zsh)
+            installShellCompletion --cmd twatch --fish <($out/bin/twatch completions fish)
           '';
         };
 
@@ -50,8 +55,7 @@
             rust-analyzer
             rustc
             gh
-            python3
-            (python3.withPackages (ps: [ ps.matplotlib ]))
+            pythonWithMatplotlib
           ];
 
           shellHook = ''
