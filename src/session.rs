@@ -1,12 +1,22 @@
 use crate::{
-    cli::ArgumentPassers,
     plot::{plot_maker, ScalingPlot},
     sensors::{device_type, search_sensors, SensorLabel},
+    tui_graph,
+    Config, GraphType,
+};
+use crossterm::{
+    event::{self, Event, KeyCode},
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+};
+use ratatui::{
+    prelude::*,
+    widgets::{Block, Borders, Gauge, Paragraph},
 };
 use std::{
     fs::{self, File},
     io::{self, Write},
-    path::{Path, PathBuf},
+    path::PathBuf,
     time::Instant,
 };
 
@@ -17,66 +27,47 @@ pub struct SessionFile {
     pub flush_interval: usize,
 }
 
-pub fn record_frame(
-    session: &mut SessionFile,
-    _countdown: u16,
-    header_msg: &str,
-) -> std::io::Result<Vec<SensorLabel>> {
-    let sensors = search_sensors()?;
-    let mut display_tui: String = Default::default();
-
-    display_tui.push_str(header_msg);
-
-    for sensor in &sensors {
-        let d_type = device_type(sensor);
-
-        if d_type == "Unknown" {
-            continue;
-        }
-
-        println!();
-        display_tui.push_str(&format!(
-            "\n [{}] {}: {}°C",
-            d_type, sensor.label, sensor.temp
-        ));
-
-        session
-            .buffer
-            .push(format!("{},{},{}", d_type, sensor.label, sensor.temp));
-    }
-    if session.buffer.len() >= session.flush_interval {
-        for line in &session.buffer {
-            writeln!(session.file, "{}", line)?;
-        }
-        session.file.flush()?;
-        session.buffer.clear();
-    }
-
-    display_tui.push_str("\x1B[J");
-    println!("{}", display_tui);
-
-    Ok(sensors)
-}
-
-pub fn session_writter(passers: &ArgumentPassers) -> std::io::Result<SessionFile> {
-    let mut session_id: u16 = 0;
-
-    // Get the absolute path to ~/Documents/Twatch/session
-    let home = PathBuf::from(std::env::var("HOME").expect("$HOME not set"));
+pub fn list_sessions() -> io::Result<Vec<(u16, PathBuf)>> {
+    let home = PathBuf::from(std::env::var("HOME").unwrap_or_default());
     let session_dir = home.join("Documents").join("Twatch").join("session");
 
+    if !session_dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut sessions = Vec::new();
+    let entries = fs::read_dir(&session_dir)?;
+
+    for entry in entries.filter_map(|r| r.ok()) {
+        let path = entry.path();
+        if path.extension().map_or(false, |ext| ext == "csv") {
+            if let Some(name) = path.file_stem() {
+                let name = name.to_string_lossy();
+                if let Some(num) = name.strip_prefix("session_") {
+                    if let Ok(id) = num.parse::<u16>() {
+                        sessions.push((id, path));
+                    }
+                }
+            }
+        }
+    }
+
+    sessions.sort_by_key(|(id, _)| *id);
+    Ok(sessions)
+}
+
+fn session_writer(delay: u64) -> io::Result<SessionFile> {
+    let home = PathBuf::from(std::env::var("HOME").unwrap_or_default());
+    let session_dir = home.join("Documents").join("Twatch").join("session");
+    fs::create_dir_all(&session_dir)?;
+
+    let mut session_id: u16 = 0;
     loop {
         let candidate = session_dir.join(format!("session_{}.csv", session_id));
-
         if !candidate.exists() {
-            if let Some(parent) = candidate.parent() {
-                std::fs::create_dir_all(parent)?;
-            }
-
             let mut file = File::create(&candidate)?;
-            writeln!(file, "# Delay:{}", passers.ms_delay)?;
+            writeln!(file, "# Delay:{}", delay)?;
             writeln!(file, "Type,Label,Temp")?;
-
             return Ok(SessionFile {
                 id: session_id,
                 file,
@@ -87,145 +78,245 @@ pub fn session_writter(passers: &ArgumentPassers) -> std::io::Result<SessionFile
         session_id += 1;
     }
 }
-pub fn trigger_by_temperature(passers: &ArgumentPassers) -> std::io::Result<()> {
-    print!("\r\x1B[2J\x1B[1;1H");
-    let mut session = session_writter(passers)?;
-    let mut countdown: u16 = 0;
 
-    let total_start = Instant::now();
-    loop {
-        print!("\r\x1B[2J\x1B[1;1H");
+fn flush_buffer(session: &mut SessionFile) -> io::Result<()> {
+    for line in &session.buffer {
+        writeln!(session.file, "{}", line)?;
+    }
+    session.file.flush()?;
+    session.buffer.clear();
+    Ok(())
+}
 
-        countdown += 1;
-
-        let status_header = format!(
-            "--- Trigger Monitor ---\nRange: [Start: {}°C, End: {}°C]",
-            passers.initial_temperature, passers.end_temperature
-        );
-
-        let sensors = record_frame(&mut session, countdown, &status_header)?;
-        let cpu_temp = sensors
-            .iter()
-            .find(|s| s.is_cpu)
-            .map(|s| s.temp)
-            .expect("Unable to read CPU temperature");
-
-        println!("\nStatus:");
-
-        if cpu_temp >= passers.initial_temperature {
-            println!(
-                "\x1B[33m Trigger Active: {}°C >= {}°C\x1B[0m",
-                cpu_temp, passers.initial_temperature
-            );
-        } else {
-            println!("Below Target");
+fn record_frame(session: &mut SessionFile, sensors: &[SensorLabel]) -> io::Result<()> {
+    for sensor in sensors {
+        let d_type = device_type(sensor);
+        if d_type == "Unknown" {
+            continue;
         }
-
-        if cpu_temp > passers.end_temperature {
-            println!("\x1B[31m Limit reached ({}°C).\x1B[0m", cpu_temp);
-            writeln!(
-                session.file,
-                "#Total: {:.3}",
-                total_start.elapsed().as_secs()
-            )?;
-            writeln!(session.file, "CPU,Exit,{}", cpu_temp)?;
-            plot_maker(
-                None,
-                ScalingPlot {
-                    max_plot_temperature: passers.max_plot_temperature,
-                    number_of_steps_for_graph: passers.number_of_steps_for_graph,
-                },
-            );
-            break;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(passers.ms_delay));
+        session
+            .buffer
+            .push(format!("{},{},{}", d_type, sensor.label, sensor.temp));
+    }
+    if session.buffer.len() >= session.flush_interval {
+        flush_buffer(session)?;
     }
     Ok(())
 }
 
-pub fn session_selector(arg_passers: &mut ArgumentPassers) -> io::Result<()> {
-    let home = PathBuf::from(std::env::var("HOME").expect("$HOME not set"));
-    let twatch_dir = home.join("Documents").join("Twatch");
+fn draw_live_frame(frame: &mut Frame, sensors: &[SensorLabel], status: &str, subtitle: &str) {
+    let area = frame.area();
 
-    if let Err(e) = fs::create_dir_all(&twatch_dir) {
-        eprintln!(
-            "Error: Could not create directory at '{:?}': {}",
-            twatch_dir, e
-        );
-    }
+    let header = Paragraph::new(status)
+        .block(Block::default().borders(Borders::ALL).title(" Twatch "))
+        .style(Style::default().fg(Color::Cyan));
 
-    let entries = fs::read_dir(&twatch_dir)?
-        .filter_map(|res| res.ok())
-        .map(|e| e.path())
-        .collect::<Vec<_>>();
+    let header_height = 3;
+    let footer_height = 1;
 
-    let found_session = entries
+    let layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(header_height),
+            Constraint::Min(0),
+            Constraint::Length(footer_height),
+        ])
+        .split(area);
+
+    frame.render_widget(header, layout[0]);
+
+    let sensor_count = sensors
         .iter()
-        .any(|p| p.file_name() == Some("session".as_ref()) && p.is_dir());
-
-    if found_session {
-        arg_passers.session_exists = found_session;
+        .filter(|s| device_type(s) != "Unknown")
+        .count();
+    if sensor_count == 0 {
+        let msg =
+            Paragraph::new("No sensors found").block(Block::default().borders(Borders::ALL));
+        frame.render_widget(msg, layout[1]);
+        return;
     }
 
-    if arg_passers.see_sessions && found_session {
-        let session_dir = twatch_dir.join("session");
-        let session_files = fs::read_dir(&session_dir)?
-            .filter_map(|res| res.ok())
-            .map(|e| e.path())
-            .filter(|p| p.extension().map_or(false, |ext| ext == "csv"));
+    let sensor_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(
+            (0..sensor_count)
+                .map(|_| Constraint::Length(3))
+                .collect::<Vec<_>>(),
+        )
+        .split(layout[1]);
 
-        for path in session_files {
-            println!("{}", path.display());
+    let max_temp: u32 = sensors
+        .iter()
+        .map(|s| s.temp)
+        .max()
+        .unwrap_or(100)
+        .max(100);
+
+    let mut row = 0;
+    for sensor in sensors {
+        let d_type = device_type(sensor);
+        if d_type == "Unknown" || row >= sensor_layout.len() {
+            continue;
         }
-    }
 
-    Ok(())
-}
+        let ratio = (sensor.temp as f64 / max_temp as f64).min(1.0);
+        let color = if sensor.temp >= 70 {
+            Color::Red
+        } else if sensor.temp >= 50 {
+            Color::Yellow
+        } else {
+            Color::Green
+        };
 
-pub fn by_capture_limit(passers: &ArgumentPassers) -> std::io::Result<()> {
-    let mut session = session_writter(passers)?;
-    let mut countdown: u16 = 0;
+        let label = format!("[{}] {}", d_type, sensor.label);
+        let gauge = Gauge::default()
+            .block(Block::default().borders(Borders::NONE))
+            .gauge_style(Style::default().fg(color))
+            .ratio(ratio)
+            .label(label);
 
-    let total_start = Instant::now();
-    loop {
-        print!("\r\x1B[2J\x1B[1;1H");
+        frame.render_widget(gauge, sensor_layout[row]);
 
-        countdown += 1;
-
-        let status_header = format!(
-            "--- Trigger Monitor ---\nCurrent: [{}] Target: [{}]\n",
-            countdown, passers.amount_captures
+        let value = format!("{}°C", sensor.temp);
+        let value_area = Rect {
+            x: sensor_layout[row]
+                .x
+                .saturating_add(sensor_layout[row].width.saturating_sub(10)),
+            y: sensor_layout[row].y.saturating_add(1),
+            width: 8,
+            height: 1,
+        };
+        frame.render_widget(
+            Paragraph::new(value).style(Style::default().fg(color).add_modifier(Modifier::BOLD)),
+            value_area,
         );
 
-        let sensors = record_frame(&mut session, countdown, &status_header)?;
-
-        let cpu_temp = sensors
-            .iter()
-            .find(|s| s.is_cpu)
-            .map(|s| s.temp)
-            .expect("Unable to read CPU Temperatures");
-
-        if countdown >= passers.amount_captures {
-            println!(
-                "\n\x1B[31mTarget reached: [{}]\x1B[0m",
-                passers.amount_captures
-            );
-            writeln!(
-                session.file,
-                "#Total: {:.3}",
-                total_start.elapsed().as_secs()
-            )?;
-            writeln!(session.file, "CPU,Exit,{}", cpu_temp)?;
-            plot_maker(
-                None,
-                ScalingPlot {
-                    max_plot_temperature: passers.max_plot_temperature,
-                    number_of_steps_for_graph: passers.number_of_steps_for_graph,
-                },
-            );
-            break;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(passers.ms_delay));
+        row += 1;
     }
+
+    let footer = Paragraph::new(subtitle)
+        .style(Style::default().fg(Color::DarkGray))
+        .alignment(Alignment::Center);
+    frame.render_widget(footer, layout[2]);
+}
+
+pub fn run_session(
+    config: &Config,
+    by_temperature: bool,
+    count: Option<u16>,
+    initial_temp: u32,
+    end_temp: u32,
+    graph_type: Option<GraphType>,
+) -> io::Result<()> {
+    let capture_limit = count.unwrap_or(250);
+    let ms_delay = config.delay;
+
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen)?;
+
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+
+    let mut session = session_writer(ms_delay)?;
+    let session_id = session.id;
+    let mut elapsed = 0u16;
+    let total_start = Instant::now();
+
+    let result = (|| -> io::Result<bool> {
+        loop {
+            let sensors = search_sensors()?;
+            record_frame(&mut session, &sensors)?;
+            let cpu_temp = sensors
+                .iter()
+                .find(|s| s.is_cpu)
+                .map(|s| s.temp)
+                .unwrap_or(0);
+
+            let status = if by_temperature {
+                format!(
+                    "Temp Trigger  |  CPU: {}°C  |  Range: [{}, {}]°C",
+                    cpu_temp, initial_temp, end_temp
+                )
+            } else {
+                format!(
+                    "Capture Limit  |  {}/{}  |  CPU: {}°C",
+                    elapsed, capture_limit, cpu_temp
+                )
+            };
+
+            let subtitle = format!(
+                "Delay: {}ms  |  Session {}  |  q=quit",
+                ms_delay, session_id
+            );
+
+            terminal
+                .draw(|f| draw_live_frame(f, &sensors, &status, &subtitle))
+                .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+
+            if event::poll(std::time::Duration::from_millis(ms_delay / 4))
+                .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?
+            {
+                if let Event::Key(key) =
+                    event::read().map_err(|e| io::Error::new(io::ErrorKind::Other, e))?
+                {
+                    if key.code == KeyCode::Char('q') || key.code == KeyCode::Esc {
+                        let _ = flush_buffer(&mut session);
+                        return Ok(false);
+                    }
+                }
+            }
+
+            std::thread::sleep(std::time::Duration::from_millis(ms_delay * 3 / 4));
+
+            if by_temperature && cpu_temp >= end_temp {
+                flush_buffer(&mut session)?;
+                writeln!(
+                    session.file,
+                    "#Total: {:.3}",
+                    total_start.elapsed().as_secs()
+                )?;
+                writeln!(session.file, "CPU,Exit,{}", cpu_temp)?;
+                return Ok(true);
+            }
+
+            if !by_temperature {
+                elapsed += 1;
+                if elapsed >= capture_limit {
+                    flush_buffer(&mut session)?;
+                    writeln!(
+                        session.file,
+                        "#Total: {:.3}",
+                        total_start.elapsed().as_secs()
+                    )?;
+                    writeln!(session.file, "CPU,Exit,{}", cpu_temp)?;
+                    return Ok(true);
+                }
+            }
+        }
+    })();
+
+    disable_raw_mode()?;
+    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+    terminal.show_cursor().ok();
+
+    let completed = result?;
+
+    if !config.no_graph && completed {
+        let scale = ScalingPlot {
+            max_plot_temperature: config.max_plot_temp,
+            number_of_steps_for_graph: config.temp_steps,
+        };
+
+        match graph_type {
+            Some(GraphType::Tui) => {
+                let _ = tui_graph::show_graph(Some(session_id));
+            }
+            _ => {
+                plot_maker(Some(session_id), scale);
+            }
+        }
+    }
+
     Ok(())
 }

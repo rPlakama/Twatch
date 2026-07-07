@@ -1,7 +1,7 @@
 use gtk::prelude::*;
 use gtk::{Application, ApplicationWindow, DrawingArea};
 use gtk4::{self as gtk, Frame};
-use std::{collections::HashMap, fs, path::PathBuf};
+use std::{cell::Cell, collections::HashMap, fs, path::PathBuf, rc::Rc};
 
 #[derive(Clone)]
 pub struct SensorData {
@@ -48,18 +48,15 @@ pub fn parse_session_data(csv_content: &str) -> PlotData {
 
 pub fn plot_maker(session_id: Option<u16>, scale: ScalingPlot) {
     let home = PathBuf::from(std::env::var("HOME").expect("$HOME not set"));
-    // Add the "session" subfolder to the path
     let session_dir = home.join("Documents").join("Twatch").join("session");
 
     let csv_content = match session_id {
         Some(id) => {
-            // Now this points to ~/Documents/Twatch/session/session_X.csv
             let path = session_dir.join(format!("session_{}.csv", id));
             fs::read_to_string(&path)
                 .unwrap_or_else(|_| panic!("Unable to read session file: {:?}", path))
         }
         None => {
-            // Read the contents of the "session" subdirectory, not the parent "Twatch" directory
             let dir =
                 fs::read_dir(&session_dir).expect("Failed to read session folder (ERR plot.rs)");
 
@@ -85,32 +82,65 @@ pub fn plot_maker(session_id: Option<u16>, scale: ScalingPlot) {
     app.connect_activate(move |app| build_ui(scale, app, plot_data.clone()));
     app.run_with_args(&Vec::<String>::new());
 }
-// I plan to dith it for eGUI
+
 pub fn build_ui(scale: ScalingPlot, app: &Application, plot_data: PlotData) {
-    // Window Title
     let content = Frame::new(Some("Current Session ID "));
     let drawing_area = DrawingArea::new();
+
+    let zoom_level = Rc::new(Cell::new(1.0f64));
+    let pan_x = Rc::new(Cell::new(0.0f64));
+    let pan_y = Rc::new(Cell::new(0.0f64));
+
+    let scroll = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::VERTICAL);
+    let zl = zoom_level.clone();
+    scroll.connect_scroll(move |_, _dx, dy| {
+        let current = zl.get();
+        let new = if dy > 0.0 {
+            current * 1.15
+        } else {
+            current / 1.15
+        };
+        zl.set(new.clamp(0.3, 10.0));
+        gtk::glib::Propagation::Stop
+    });
+    drawing_area.add_controller(scroll);
+
+    let drag = gtk::GestureDrag::new();
+    let px = pan_x.clone();
+    let py = pan_y.clone();
+    drag.connect_drag_update(move |_, dx, dy| {
+        let new_x = px.get() + dx as f64;
+        let new_y = py.get() + dy as f64;
+        px.set(new_x.clamp(-500.0, 500.0));
+        py.set(new_y.clamp(-500.0, 500.0));
+    });
+    drawing_area.add_controller(drag);
 
     drawing_area.set_draw_func(move |_area, context, width, height| {
         let w = width as f64;
         let h = height as f64;
 
-        // Background
         context.set_source_rgb(1.0, 1.0, 1.0);
         context.paint().expect("Failed to paint");
+
+        let zoom = zoom_level.get();
+        let pan_x_val = pan_x.get();
+        let pan_y_val = pan_y.get();
 
         let margin_left = 60.0;
         let margin_right = 40.0;
         let margin_top = 40.0;
         let margin_bottom = 50.0;
 
-        let plot_width = w - margin_left - margin_right;
-        let plot_height = h - margin_top - margin_bottom;
+        let plot_width = (w - margin_left - margin_right) * zoom;
+        let plot_height = (h - margin_top - margin_bottom) * zoom;
+
+        context.save().expect("Failed to save context");
+        context.translate(pan_x_val, pan_y_val);
 
         let x_inner_pad = 30.0;
         let effect_width = plot_width - (x_inner_pad * 2.0);
 
-        // Draw axes
         context.set_source_rgb(0.0, 0.0, 0.0);
         context.set_line_width(2.0);
         context.move_to(margin_left, margin_top);
@@ -118,7 +148,6 @@ pub fn build_ui(scale: ScalingPlot, app: &Application, plot_data: PlotData) {
         context.line_to(w - margin_right, h - margin_bottom);
         context.stroke().expect("Failed to stroke axes");
 
-        // Grid lines
         context.set_line_width(0.5);
         context.set_source_rgb(0.8, 0.8, 0.8);
 
@@ -127,10 +156,7 @@ pub fn build_ui(scale: ScalingPlot, app: &Application, plot_data: PlotData) {
         let num_lines = (max_temp / step_val).floor() as usize;
 
         for i in 0..=num_lines {
-            // Temperature spacing
             let temp = (i as f64) * step_val;
-
-            // Total range (Using dynamic max_temp instead of 110.0)
             let y = h - margin_bottom - (temp / max_temp) * plot_height;
 
             context.move_to(margin_left, y);
@@ -174,7 +200,6 @@ pub fn build_ui(scale: ScalingPlot, app: &Application, plot_data: PlotData) {
             context.set_source_rgb(0.8, 0.8, 0.8);
         }
 
-        // Plot lines
         let colors = vec![
             (1.0, 0.5, 0.5),
             (0.2, 0.8, 0.2),
@@ -193,8 +218,6 @@ pub fn build_ui(scale: ScalingPlot, app: &Application, plot_data: PlotData) {
                 for (i, &temp) in data.temps.iter().enumerate() {
                     let pct = i as f64 / num_samples as f64;
                     let x = margin_left + x_inner_pad + (pct * effect_width);
-
-                    // FIX 5: Use dynamic max_temp here too
                     let y = h - margin_bottom - (temp / max_temp) * plot_height;
 
                     if i == 0 {
@@ -207,7 +230,6 @@ pub fn build_ui(scale: ScalingPlot, app: &Application, plot_data: PlotData) {
             }
         }
 
-        // Legend
         let legend_x = w - margin_right - 120.0;
         let mut legend_y = margin_top + 20.0;
         let mut color_iter = colors.iter().cycle();
@@ -225,13 +247,15 @@ pub fn build_ui(scale: ScalingPlot, app: &Application, plot_data: PlotData) {
                 .expect("Failed to show text");
             legend_y += 20.0;
         }
+
+        context.restore().expect("Failed to restore context");
     });
 
     content.set_child(Some(&drawing_area));
 
     let window = ApplicationWindow::builder()
         .application(app)
-        .title("Twatch Temperature Plot")
+        .title("Twatch Temperature Plot (scroll=zoom, drag=pan)")
         .default_width(1000)
         .default_height(400)
         .child(&content)
