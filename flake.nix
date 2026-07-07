@@ -22,7 +22,7 @@
 
         packages.default = pkgs.rustPlatform.buildRustPackage {
           pname = "twatch";
-          version = "0.1.5";
+          version = "1.0.0";
 
           src = ./.;
 
