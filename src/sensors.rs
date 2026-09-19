@@ -33,6 +33,8 @@ pub struct SensorDescriptor {
     pub id: String,
     pub kind: DeviceKind,
     pub device_name: String,
+    /// Vendor model string for NVMe controllers (e.g. "Micron MTFDKCD512QGN-1BN1AABLA").
+    pub model: Option<String>,
     pub label: String,
     pub input_path: PathBuf,
     pub crit_temp: Option<f64>,
@@ -45,6 +47,8 @@ pub struct SensorReading {
     pub id: String,
     pub kind: DeviceKind,
     pub device_name: String,
+    /// Vendor model string for NVMe controllers, when discoverable via sysfs.
+    pub model: Option<String>,
     pub label: String,
     pub temp: f64,
     pub crit_temp: Option<f64>,
@@ -71,6 +75,16 @@ impl SensorReading {
 
     pub fn is_nvme(&self) -> bool {
         self.kind == DeviceKind::Nvme
+    }
+
+    /// Human-facing device name, resolved from sysfs/DMI per device kind
+    /// (e.g. "AMD Ryzen AI 7 350 w/ Radeon 860M", "Micron MTFDKCD512QGN-1BN1AABLA",
+    /// "BYD L24B3PK2"). Falls back to the kernel node name ("nvme0").
+    pub fn display_name(&self) -> String {
+        if let Some(model) = self.model.as_deref().filter(|m| !m.is_empty()) {
+            return model.to_string();
+        }
+        self.device_name.clone()
     }
 }
 
@@ -152,6 +166,190 @@ fn classify_device(name: &str, path: &Path) -> DeviceKind {
     }
 }
 
+/// Resolve the vendor model of an NVMe controller (e.g. "nvme0") from sysfs.
+/// This is the native equivalent of `lsblk -o MODEL` for a single device.
+fn resolve_nvme_model(device_name: &str) -> Option<String> {
+    if !device_name.starts_with("nvme") {
+        return None;
+    }
+    let candidates = [
+        format!("/sys/class/nvme/{}/model", device_name),
+        format!("/sys/block/{}n1/device/model", device_name),
+    ];
+    for candidate in candidates {
+        if let Ok(content) = fs::read_to_string(&candidate) {
+            let model = content.trim();
+            if !model.is_empty() {
+                return Some(model.to_string());
+            }
+        }
+    }
+    None
+}
+
+/// Best-effort human-readable device name for any sensor kind. Returns `None`
+/// when the kernel exposes no useful identifier, letting callers fall back to
+/// the device's kernel node name.
+fn resolve_device_model(kind: DeviceKind, hwmon_path: &Path, device_name: &str) -> Option<String> {
+    match kind {
+        DeviceKind::Cpu => read_cpu_model(),
+        DeviceKind::Gpu => resolve_gpu_model(hwmon_path),
+        DeviceKind::Nvme => resolve_nvme_model(device_name),
+        DeviceKind::Memory => resolve_dimm_name(hwmon_path),
+        DeviceKind::Motherboard => resolve_dmi_name(),
+        DeviceKind::Battery => resolve_power_supply_name(device_name),
+        _ => None,
+    }
+}
+
+/// Read a sysfs file and return its trimmed contents, or `None` when missing/empty.
+fn read_trim(path: &Path) -> Option<String> {
+    let content = fs::read_to_string(path).ok()?;
+    let trimmed = content.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
+}
+
+/// Read the CPU marketing name from `/proc/cpuinfo` (e.g. "AMD Ryzen AI 7 350").
+fn read_cpu_model() -> Option<String> {
+    let content = fs::read_to_string("/proc/cpuinfo").ok()?;
+    for line in content.lines() {
+        if let Some(rest) = line.strip_prefix("model name") {
+            if let Some((_, value)) = rest.split_once(':') {
+                let value = value.trim();
+                if !value.is_empty() {
+                    return Some(value.to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
+fn resolve_gpu_model(hwmon_path: &Path) -> Option<String> {
+    // NVIDIA's proprietary driver publishes the board name under /proc.
+    if let Ok(entries) = fs::read_dir("/proc/driver/nvidia/gpus") {
+        for entry in entries.flatten() {
+            if let Ok(info) = fs::read_to_string(entry.path().join("information")) {
+                for line in info.lines() {
+                    if let Some(value) = line.strip_prefix("Model:") {
+                        let value = value.trim();
+                        if !value.is_empty() {
+                            return Some(value.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Some AMD drivers expose the marketing name in DRM sysfs.
+    if let Ok(entries) = fs::read_dir("/sys/class/drm") {
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            // Whole cards only ("card0"), not connectors ("card0-DP-1").
+            if !name.starts_with("card") || name.contains('-') {
+                continue;
+            }
+            if let Some(product) = read_trim(&entry.path().join("device/product_name")) {
+                return Some(product);
+            }
+        }
+    }
+
+    // Fall back to the PCI vendor of the controller backing this hwmon.
+    let vendor = fs::read_to_string(hwmon_path.join("device/vendor")).ok()?;
+    match vendor.trim() {
+        "0x1002" => {
+            // AMD APUs usually name the integrated Radeon in the CPU model string.
+            // Only trust that when there is a single GPU, so a discrete card on an
+            // APU system isn't mislabelled with the integrated name.
+            if count_drm_cards() <= 1 {
+                let cpu = read_cpu_model().unwrap_or_default();
+                if let Some(idx) = cpu.find("Radeon") {
+                    return Some(cpu[idx..].trim().to_string());
+                }
+            }
+            Some("AMD GPU".to_string())
+        }
+        "0x10de" => Some("NVIDIA GPU".to_string()),
+        "0x8086" => Some("Intel GPU".to_string()),
+        _ => None,
+    }
+}
+
+/// Count whole DRM cards ("card0"), ignoring connectors ("card0-DP-1").
+fn count_drm_cards() -> usize {
+    let mut count = 0;
+    if let Ok(entries) = fs::read_dir("/sys/class/drm") {
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            if name.starts_with("card") && !name.contains('-') {
+                count += 1;
+            }
+        }
+    }
+    count
+}
+
+/// SPD5118 sensors live at `.../i2c-<bus>/<bus>-<addr>`. JEDEC SPD addresses
+/// span 0x50..=0x57, so map them onto slot numbers: 0x50 -> "DIMM 0".
+fn resolve_dimm_name(hwmon_path: &Path) -> Option<String> {
+    let real = fs::canonicalize(hwmon_path.join("device")).ok()?;
+    let leaf = real.file_name()?.to_string_lossy();
+    let addr_str = leaf.rsplit('-').next()?;
+    let addr = u32::from_str_radix(addr_str, 16).ok()?;
+    if (0x50..=0x57).contains(&addr) {
+        Some(format!("DIMM {}", addr - 0x50))
+    } else {
+        None
+    }
+}
+
+/// Machine/board identity from DMI (e.g. "LENOVO 83NJ").
+fn resolve_dmi_name() -> Option<String> {
+    let vendor = read_trim(Path::new("/sys/class/dmi/id/sys_vendor"));
+    let product = read_trim(Path::new("/sys/class/dmi/id/product_name"));
+    match (vendor, product) {
+        (Some(vendor), Some(product)) => {
+            if product.to_lowercase().contains(&vendor.to_lowercase()) {
+                Some(product)
+            } else {
+                Some(format!("{} {}", vendor, product))
+            }
+        }
+        (Some(vendor), None) => Some(vendor),
+        (None, Some(product)) => Some(product),
+        (None, None) => None,
+    }
+}
+
+/// Battery/AC name from the power-supply class (e.g. "BYD L24B3PK2").
+fn resolve_power_supply_name(device_name: &str) -> Option<String> {
+    let base = PathBuf::from("/sys/class/power_supply").join(device_name);
+    if !base.is_dir() {
+        return None;
+    }
+    let manufacturer = read_trim(&base.join("manufacturer"));
+    let model = read_trim(&base.join("model_name"));
+    match (manufacturer, model) {
+        (Some(manufacturer), Some(model)) => Some(format!("{} {}", manufacturer, model)),
+        (Some(manufacturer), None) => Some(manufacturer),
+        (None, Some(model)) => Some(model),
+        (None, None) => match read_trim(&base.join("type")).as_deref() {
+            // AC adapters frequently expose no model at all.
+            Some("Mains") => Some("AC Adapter".to_string()),
+            Some("USB") => Some("USB Power".to_string()),
+            _ => None,
+        },
+    }
+}
+
 fn resolve_device_name(hwmon_path: &Path, base_name: &str) -> String {
     // For NVMe devices, extract the specific device node like "nvme0" or "nvme1"
     let device_symlink = hwmon_path.join("device");
@@ -212,6 +410,7 @@ pub fn discover_sensors() -> Vec<SensorDescriptor> {
 
         let kind = classify_device(&base_name, &path);
         let device_name = resolve_device_name(&path, &base_name);
+        let model = resolve_device_model(kind, &path, &device_name);
 
         let dir_entries = match fs::read_dir(&path) {
             Ok(e) => e,
@@ -247,6 +446,7 @@ pub fn discover_sensors() -> Vec<SensorDescriptor> {
                     id,
                     kind,
                     device_name: device_name.clone(),
+                    model: model.clone(),
                     label,
                     input_path: sub_entry.path(),
                     crit_temp,
@@ -277,6 +477,7 @@ pub fn read_descriptors(descriptors: &[SensorDescriptor]) -> Vec<SensorReading> 
                     id: desc.id.clone(),
                     kind: desc.kind,
                     device_name: desc.device_name.clone(),
+                    model: desc.model.clone(),
                     label: desc.label.clone(),
                     temp,
                     crit_temp: desc.crit_temp,
@@ -297,13 +498,18 @@ pub fn search_sensors() -> std::io::Result<Vec<SensorReading>> {
 /// Squash multi-channel sensors (e.g. NVMe) per physical device unless full_devices_sensors is requested.
 pub fn squash_sensors(readings: &[SensorReading], full_devices_sensors: bool) -> Vec<SensorReading> {
     if full_devices_sensors {
-        // Tag NVMe labels with device name if not already tagged
+        // Prefix each named device's channels with its resolved name
         return readings
             .iter()
             .map(|r| {
                 let mut cloned = r.clone();
-                if cloned.kind == DeviceKind::Nvme && !cloned.label.starts_with(&cloned.device_name) {
-                    cloned.label = format!("{}: {}", cloned.device_name, cloned.label);
+                // Tag every device that has a resolved name (NVMe always, so its
+                // kernel node stays visible when no model is exposed).
+                if cloned.kind == DeviceKind::Nvme || cloned.model.is_some() {
+                    let display = cloned.display_name();
+                    if !cloned.label.starts_with(&display) {
+                        cloned.label = format!("{}: {}", display, cloned.label);
+                    }
                 }
                 cloned
             })
@@ -337,7 +543,9 @@ pub fn squash_sensors(readings: &[SensorReading], full_devices_sensors: bool) ->
             });
 
         let mut squashed = (*chosen).clone();
-        squashed.label = dev; // Clean single label: e.g. "nvme0"
+        // Clean single label: the drive's model (e.g. "Micron MTFDKCD5...") or,
+        // when the model is unavailable, its kernel node (e.g. "nvme0").
+        squashed.label = chosen.display_name();
         result.push(squashed);
     }
 

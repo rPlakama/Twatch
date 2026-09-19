@@ -22,7 +22,7 @@
 
         packages.default = pkgs.rustPlatform.buildRustPackage {
           pname = "twatch";
-          version = "0.2.0";
+          version = "0.2.1";
 
           src = ./.;
 
@@ -31,7 +31,7 @@
             pkg-config
             installShellFiles
           ];
-          buildInputs = with pkgs; [];
+          buildInputs = with pkgs; [ ];
           postInstall = ''
             installShellCompletion --cmd twatch --bash <($out/bin/twatch completions bash)
             installShellCompletion --cmd twatch --zsh  <($out/bin/twatch completions zsh)

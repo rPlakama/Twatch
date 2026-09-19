@@ -358,10 +358,10 @@ fn print_current_temperatures(full_sensors: bool) {
             println!("Hardware Thermal Sensors:");
             println!("{:-<55}", "");
 
-            let mut current_kind = None;
+            let mut current_group: Option<(DeviceKind, String)> = None;
             for s in &sensors {
-                if current_kind != Some(s.kind) {
-                    current_kind = Some(s.kind);
+                let group = (s.kind, s.display_name());
+                if current_group.as_ref() != Some(&group) {
                     let freq_str = match s.kind {
                         DeviceKind::Cpu => {
                             cpu_freq.map_or(String::new(), |f| {
@@ -373,7 +373,15 @@ fn print_current_temperatures(full_sensors: bool) {
                         }
                         _ => String::new(),
                     };
-                    println!("\n  [{}]{}", s.kind, freq_str);
+                    // Full-sensor labels are already prefixed with the device
+                    // name, so only show it in the header for the default view.
+                    let name = if full_sensors {
+                        String::new()
+                    } else {
+                        format!(" {}", group.1)
+                    };
+                    println!("\n  [{}]{}{}", s.kind, name, freq_str);
+                    current_group = Some(group);
                 }
 
                 let color_prefix = if s.temp >= 85.0 {

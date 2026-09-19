@@ -444,8 +444,10 @@ impl LiveState {
                 *entry = s;
             }
         }
-        for (dev, s) in nvme_by_dev {
-            let squashed_key = format!("{}:{}", s.kind, dev);
+        for (_, s) in nvme_by_dev {
+            // Use the same human-facing name as squash_sensors() so the squashed
+            // table view can look up MIN/AVG/MAX stats for the drive.
+            let squashed_key = format!("{}:{}", s.kind, s.display_name());
             self.histories
                 .entry(squashed_key)
                 .or_default()
@@ -639,6 +641,17 @@ fn draw_btop_frame(
 
     let display_sensors = squash_sensors(sensors, state.full_devices_sensors);
 
+    // Estimated width of the LABEL column. The table is Constraint::Min(28) here,
+    // with the remaining columns fixed-width and one cell of spacing between each
+    // of the 8 columns. NVMe model names use whatever room is left, and are only
+    // trimmed when the terminal is too narrow to show them in full.
+    const FIXED_COLUMN_WIDTHS: usize = 8 + 10 + 8 + 8 + 8 + 10 + 18;
+    const COLUMN_GAPS: usize = 7;
+    let table_inner_width = area.width.saturating_sub(2) as usize;
+    let label_width = table_inner_width
+        .saturating_sub(FIXED_COLUMN_WIDTHS + COLUMN_GAPS)
+        .max(28);
+
     let rows: Vec<Row> = display_sensors
         .iter()
         .map(|s| {
@@ -673,13 +686,23 @@ fn draw_btop_frame(
                         .get(dev_key)
                         .copied()
                         .unwrap_or((0.0, 0.0));
+                    let read_str = format_bytes_per_sec(read_bps);
+                    let write_str = format_bytes_per_sec(write_bps);
+                    // Width of the rendered "  ↑ <read> ↓ <write>" suffix.
+                    let io_width = read_str.chars().count() + write_str.chars().count() + 7;
+                    // Show the full model name, trimming it only when the column is
+                    // too narrow to fit it alongside the read/write rates.
+                    let model = truncate_to_width(
+                        &s.label,
+                        label_width.saturating_sub(io_width),
+                    );
                     vec![
-                        Span::styled(s.label.clone(), Style::default().fg(Color::White)),
+                        Span::styled(model, Style::default().fg(Color::White)),
                         Span::raw("  "),
                         Span::styled("↑", Style::default().fg(Color::Green).bold()),
-                        Span::raw(format!(" {} ", format_bytes_per_sec(read_bps))),
+                        Span::raw(format!(" {} ", read_str)),
                         Span::styled("↓", Style::default().fg(Color::Magenta).bold()),
-                        Span::raw(format!(" {}", format_bytes_per_sec(write_bps))),
+                        Span::raw(format!(" {}", write_str)),
                     ]
                 }
                 _ => vec![Span::styled(s.label.clone(), Style::default().fg(Color::White))],
@@ -848,6 +871,23 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
             Constraint::Percentage((100 - percent_x) / 2),
         ])
         .split(popup_layout[1])[1]
+}
+
+/// Trim `text` to at most `max_chars` characters, appending an ellipsis when it
+/// does not fit. Returns the text unchanged when it already fits.
+fn truncate_to_width(text: &str, max_chars: usize) -> String {
+    if text.chars().count() <= max_chars {
+        return text.to_string();
+    }
+    if max_chars == 0 {
+        return String::new();
+    }
+    if max_chars == 1 {
+        return "…".to_string();
+    }
+    let mut trimmed: String = text.chars().take(max_chars - 1).collect();
+    trimmed.push('…');
+    trimmed
 }
 
 /// Run an interactive recording session or live dashboard
