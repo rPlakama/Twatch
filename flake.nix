@@ -1,5 +1,5 @@
 {
-  description = "Twatch package";
+  description = "Twatch - btop-grade temperature monitoring and graphing TUI";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -16,29 +16,23 @@
       system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
-        pythonWithMatplotlib = pkgs.python3.withPackages (ps: [ ps.matplotlib ]);
       in
       {
         formatter = pkgs.alejandra;
 
         packages.default = pkgs.rustPlatform.buildRustPackage {
           pname = "twatch";
-          version = "1.0.0";
+          version = "0.2.0";
 
           src = ./.;
 
           cargoLock.lockFile = ./Cargo.lock;
           nativeBuildInputs = with pkgs; [
             pkg-config
-            makeBinaryWrapper
             installShellFiles
           ];
-          buildInputs = with pkgs; [
-            pythonWithMatplotlib
-          ];
+          buildInputs = with pkgs; [];
           postInstall = ''
-            cp ${./plot.py} $out/bin/plot.py
-            wrapProgram $out/bin/twatch --prefix PATH : ${pythonWithMatplotlib}/bin
             installShellCompletion --cmd twatch --bash <($out/bin/twatch completions bash)
             installShellCompletion --cmd twatch --zsh  <($out/bin/twatch completions zsh)
             installShellCompletion --cmd twatch --fish <($out/bin/twatch completions fish)
@@ -55,11 +49,11 @@
             rust-analyzer
             rustc
             gh
-            pythonWithMatplotlib
+            fish
           ];
 
           shellHook = ''
-            rust-analyzer --version; gh --version; cargo --version; echo "Loaded!"; fish
+            rust-analyzer --version; gh --version; cargo --version; echo "Loaded!"
           '';
         };
       }
