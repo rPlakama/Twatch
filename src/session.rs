@@ -423,6 +423,34 @@ impl LiveState {
                 .or_default()
                 .update(elapsed_sec, s.temp, 90);
         }
+
+        // Also track NVMe sensors under their squashed device_name key so the
+        // squashed table view ("NVMe:nvme0") can look up MIN/AVG/MAX stats.
+        // Selection logic mirrors squash_sensors(): prefer Composite, else max temp.
+        use std::collections::HashMap as HM;
+        let mut nvme_by_dev: HM<&str, &SensorReading> = HM::new();
+        for s in sensors {
+            if s.kind != DeviceKind::Nvme {
+                continue;
+            }
+            let dev = s.device_name.as_str();
+            let is_composite = s.label.to_lowercase().contains("composite");
+            let entry = nvme_by_dev.entry(dev).or_insert(s);
+            if is_composite {
+                // Composite always wins
+                *entry = s;
+            } else if !entry.label.to_lowercase().contains("composite") && s.temp > entry.temp {
+                // No Composite yet — prefer higher temp
+                *entry = s;
+            }
+        }
+        for (dev, s) in nvme_by_dev {
+            let squashed_key = format!("{}:{}", s.kind, dev);
+            self.histories
+                .entry(squashed_key)
+                .or_default()
+                .update(elapsed_sec, s.temp, 90);
+        }
     }
 }
 
